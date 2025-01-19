@@ -4,6 +4,7 @@ import sys,os
 from tqdm import tqdm
 sys.path.append(os.getcwd())
 import argparse
+from functools import reduce
 from ECRECer.tools import filetool as ftool
 from ECRECer.tools import exact_ec_from_uniprot as exactec
 from ECRECer.tools import funclib
@@ -19,6 +20,7 @@ pandarallel.initialize(progress_bar=True)
 def create_tsv_from_data():
     for file in os.listdir('data'):
         if file.endswith('.data.gz'):
+            print(file)
             exactec.run_exact_task(infile=f'data/{file}', outfile=f'data/{file}.tsv')
 
 def read_txt_file(file_path):
@@ -154,13 +156,13 @@ def check_3d_information(train_path, test_path, price_path, info_file_path):
 
 
 '''
-pretrain: 108857557
-train: 556822
+pretrain: 108,857,557
+train: 556,822
 test: 2601
 price: 184
 all: 109417164
 ----------------------------------------
-Number of train ids with 3d info: 534093
+Number of train ids with 3d info: 534,093
 Number of test ids with 3d info: 1536
 Number of price ids with 3d info: 3
 '''
@@ -186,17 +188,24 @@ if __name__ == '__main__':
     check_3d_information(train_path=args.train_path, test_path=args.test_path, price_path= args.price_path, info_file_path=args.info_file_path)
 
     # Count the number of proteins in a fasta file using biopython
-    count_pretrain = count_protein_number('data/pretrain.fasta')
-    count_train = count_protein_number('data/train.fasta')
-    count_test = count_protein_number('data/test.fasta')
-    count_price = count_protein_number('data/price.fasta')
-    count_all = count_protein_number('data/all.fasta')
+    #count_pretrain = count_protein_number('data/pretrain.fasta')
+    #count_train = count_protein_number('data/train.fasta')
+    #count_test = count_protein_number('data/test.fasta')
+    #count_price = count_protein_number('data/price.fasta')
+    #count_all = count_protein_number('data/all.fasta')
 
-    print(f'pretrain: {count_pretrain}')
-    print(f'train: {count_train}')
-    print(f'test: {count_test}')
-    print(f'price: {count_price}')
-    print(f'all: {count_all}')
+    #print(f'pretrain: {count_pretrain}')
+    #print(f'train: {count_train}')
+    #print(f'test: {count_test}')
+    #print(f'price: {count_price}')
+    #print(f'all: {count_all}')
+
+    # read a tsv file and keep id and ec_number columns
+    # data = pd.read_csv('data/uniprot_sprot_2024_03.tsv', sep='\t')
+    # data = data[['id', 'seq', 'ec_number']]
+    # data = data[data['ec_number'] != '-']
+    # data = data.drop_duplicates()
+    # data.to_csv('data/uniprot_sprot_2024_03.csv', index=False)
 
     
 
