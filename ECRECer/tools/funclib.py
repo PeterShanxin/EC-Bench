@@ -7,7 +7,7 @@ from sklearn.metrics import multilabel_confusion_matrix
 from sklearn import linear_model, datasets
 from sklearn.svm import SVC
 from sklearn import tree
-from tkinter import _flatten
+#Sfrom tkinter import _flatten
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.ensemble import GradientBoostingClassifier
 from sklearn.neighbors import KNeighborsClassifier
@@ -17,11 +17,13 @@ from sklearn.model_selection import GridSearchCV
 from tqdm import tqdm
 from Bio import SeqIO
 import joblib
-
+import psutil
 import pandas as pd
 import numpy as np
 import os
-
+import sys
+sys.path.append(os.getcwd())
+import ECRECer.config as cfg
 
 table_head = [  'id', 
                 'name',
@@ -44,7 +46,14 @@ def table2fasta(table, file_out):
         file.write('{0}\n'.format(row['seq']))
     file.close()
     print('Write finished')
-    
+
+def monitor_usage():
+    # Monitor RAM usage
+    used_memory = psutil.virtual_memory()
+    used_memory = used_memory.used / (1024 ** 3)
+    disk_usage = psutil.disk_usage('/')
+    return used_memory, disk_usage
+
 #氨基酸字典(X未知项用于数据对齐)
 prot_dict = dict(
                     A=1,  R=2,  N=3,  D=4,  C=5,  E=6,  Q=7,  G=8,  H=9,  O=10, I=11, L=12, 
@@ -66,9 +75,6 @@ def dna_onehot(Xdna):
     listtmp = pd.DataFrame(np.stack(listtmp))
     listtmp = pd.concat( [Xdna.iloc[:,0:2], listtmp], axis=1)
     return listtmp
-
-
-
 
 def lrmain(X_train_std, Y_train, X_test_std, Y_test, type='binary'):
     logreg = linear_model.LogisticRegression(
@@ -179,20 +185,60 @@ def gbdtmain(X_train_std, Y_train, X_test_std, Y_test):
     
 
 def caculateMetrix(groundtruth, predict, baselineName, type='binary'):
-    acc = metrics.accuracy_score(groundtruth, predict)
     if type == 'binary':
+        acc = metrics.accuracy_score(groundtruth, predict)
         precision = metrics.precision_score(groundtruth, predict, zero_division=True )
         recall = metrics.recall_score(groundtruth, predict,  zero_division=True)
         f1 = metrics.f1_score(groundtruth, predict, zero_division=True)
         tn, fp, fn, tp = metrics.confusion_matrix(groundtruth, predict).ravel()
         npv = tn/(fn+tn+1.4E-45)
         print(baselineName, '\t\t%f' %acc,'\t%f'% precision,'\t\t%f'%npv,'\t%f'% recall,'\t%f'% f1, '\t', 'tp:',tp,'fp:',fp,'fn:',fn,'tn:',tn)
-    
     if type == 'multi':
+        acc = metrics.accuracy_score(groundtruth, predict)
         precision = metrics.precision_score(groundtruth, predict, average='macro', zero_division=True )
         recall = metrics.recall_score(groundtruth, predict, average='macro', zero_division=True)
         f1 = metrics.f1_score(groundtruth, predict, average='macro', zero_division=True)
         print('%12s'%baselineName, ' \t\t%f '%acc,'\t%f'% precision, '\t\t%f'% recall,'\t%f'% f1)
+    if type == 'unfinded':
+        # if predict is nan and groundtruth is True, then up += 1; if predict is nan and groundtruth is False, then un += 1
+        # if predict is True and groundtruth is True, then tp += 1; if predict is True and groundtruth is False, then fp += 1
+        # if predict is False and groundtruth is True, then fn += 1; if predict is False and groundtruth is False, then tn += 1
+        # acc = (tp+tn)/(tp+tn+fp+fn+up+un)
+        # ppv = tp/(tp+fp)
+        # npv = tn/(tn+fn)
+        # recall = tp/(tp+fn+up)
+        # f1 = 2 * (ppv * recall) / (ppv + recall)
+        up = 0
+        un = 0
+        tp = 0
+        fp = 0
+        fn = 0
+        tn = 0
+        for i in range(len(groundtruth)):
+            if np.isnan(predict[i]):
+                if groundtruth[i]:
+                    up += 1
+                else:
+                    un += 1
+            else:
+                if groundtruth[i]:
+                    if predict[i]:
+                        tp += 1
+                    else:
+                        fn += 1
+                else:
+                    if predict[i]:
+                        fp += 1
+                    else:
+                        tn += 1
+        sampleNum = tp+fp+tn+fn+up+un
+        acc = (tp+tn)/(sampleNum)
+        precision = tp/(tp+fp+1.4E-45)
+        npv = tn/(tn+fn+1.4E-45)
+        recall = tp/(tp+fn+up+1.4E-45)
+        f1 = 2 * (precision * recall) / (precision + recall+1.4E-45)
+
+        return baselineName, acc, precision, npv, recall, f1, tp, fp, fn, tn, up, un
 
 
 def evaluate(baslineName, X_train_std, Y_train, X_test_std, Y_test, type='binary'):
@@ -274,50 +320,50 @@ def static_interval(data, span):
         res += [[lable, num]]
     return res
         
+def get_ec_label_dict(dataframe):
+    # get column ec_number and split by ',' each row and save all unique ec_number in a dict with assigning a number to each ec_number format .npy
+    ec_label_dict = dict()
+    for index, row in dataframe.iterrows():
+        ec_list = row['ec_number'].split(',')
+        for ec in ec_list:
+            if ec not in ec_label_dict:
+                ec_label_dict[ec] = len(ec_label_dict)
+    return ec_label_dict
 
         
-def getblast(train, test):
-    
-    table2fasta(train, '/tmp/train.fasta')
-    table2fasta(test, '/tmp/test.fasta')
-    
-    cmd1 = r'diamond makedb --in /tmp/train.fasta -d /tmp/train.dmnd --quiet'
-    cmd2 = r'diamond blastp -d /tmp/train.dmnd  -q  /tmp/test.fasta -o /tmp/test_fasta_results.tsv -b5 -c1 -k 1 --quiet'
-    cmd3 = r'rm -rf /tmp/*.fasta /tmp/*.dmnd /tmp/*.tsv'
+def getblast(train):
+    table2fasta(train, 'ECRECer/tmp/train.fasta')    
+    cmd1 = 'diamond makedb --in ECRECer/tmp/train.fasta -d {0} --quiet'.format(cfg.FILE_BLAST_TRAIN_DB)
+    cmd3 = 'rm -rf ECRECer/tmp/*.fasta ECRECer/tmp/*.tsv'
     print(cmd1)
-    os.system(cmd1)
-    print(cmd2)
-    os.system(cmd2)
-    res_data = pd.read_csv('/tmp/test_fasta_results.tsv', sep='\t', names=['id', 'sseqid', 'pident', 'length','mismatch','gapopen','qstart','qend','sstart','send','evalue','bitscore'])
+    if not os.path.exists(cfg.FILE_BLAST_TRAIN_DB):
+        os.system(cmd1)
     os.system(cmd3)
-    return res_data
 
 def getblast_usedb(db, test):
-    table2fasta(test, '/tmp/test.fasta')
-    cmd2 = r'diamond blastp -d {0}  -q  /tmp/test.fasta -o /tmp/test_fasta_results.tsv -b5 -c1 -k 1 --quiet'.format(db)
-    cmd3 = r'rm -rf /tmp/*.fasta /tmp/*.dmnd /tmp/*.tsv'
-
+    table2fasta(test, 'ECRECer/tmp/test.fasta')
+    cmd2 = 'diamond blastp -d {0}  -q  ECRECer/tmp/test.fasta -o ECRECer/tmp/price_fasta_results.tsv -b5 -c1 -k 1 --quiet'.format(db)
+    cmd3 = 'rm -rf ECRECer/tmp/*.fasta ECRECer/tmp/*.tsv'
     print(cmd2)
     os.system(cmd2)
-    res_data = pd.read_csv('/tmp/test_fasta_results.tsv', sep='\t', names=['id', 'sseqid', 'pident', 'length','mismatch','gapopen','qstart','qend','sstart','send','evalue','bitscore'])
+    res_data = pd.read_csv('ECRECer/tmp/price_fasta_results.tsv', sep='\t', names=['id', 'sseqid', 'pident', 'length','mismatch','gapopen','qstart','qend','sstart','send','evalue','bitscore'])
     os.system(cmd3)
     return res_data
 
 def getblast_fasta(trainfasta, testfasta):
-    
-    cmd1 = r'diamond makedb --in {0} -d /tmp/train.dmnd --quiet'.format(trainfasta)
-    cmd2 = r'diamond blastp -d /tmp/train.dmnd  -q  {0} -o /tmp/test_fasta_results.tsv -b8 -c1 -k 1 --quiet'.format(testfasta)
-    cmd3 = r'rm -rf /tmp/*.fasta /tmp/*.dmnd /tmp/*.tsv'
+    cmd1 = 'diamond makedb --in {0} -d {1} --quiet'.format(trainfasta, cfg.FILE_BLAST_TRAIN_DB)
+    cmd2 = 'diamond blastp -d {0}  -q  {1} -o ECRECer/tmp/test_fasta_results.tsv -b8 -c1 -k 1 --quiet'.format(cfg.FILE_BLAST_TRAIN_DB, testfasta)
+    cmd3 = 'rm -rf ECRECer/tmp/*.fasta ECRECer/tmp/*.tsv'
     # print(cmd1)
     os.system(cmd1)
     # print(cmd2)
     os.system(cmd2)
-    res_data = pd.read_csv('/tmp/test_fasta_results.tsv', sep='\t', names=['id', 'sseqid', 'pident', 'length','mismatch','gapopen','qstart','qend','sstart','send','evalue','bitscore'])
+    res_data = pd.read_csv('ECRECer/tmp/test_fasta_results.tsv', sep='\t', names=['id', 'sseqid', 'pident', 'length','mismatch','gapopen','qstart','qend','sstart','send','evalue','bitscore'])
     os.system(cmd3)
     return res_data
 
 
-#region 统计EC数
+'''
 def stiatistic_ec_num(eclist):
     """统计EC数量
 
@@ -333,6 +379,7 @@ def stiatistic_ec_num(eclist):
     num_ecs = len(set(eclist))
     return num_ecs
 #endregion
+'''
 
 def caculateMetrix_1(baselineName,tp, fp, tn,fn):
     sampleNum = tp+fp+tn+fn
@@ -342,7 +389,6 @@ def caculateMetrix_1(baselineName,tp, fp, tn,fn):
     recall = tp/(tp+fn)
     f1 = 2 * (precision * recall) / (precision + recall)
     print('{0} \t {1:.6f}  \t{2:.6f} \t\t {3:.6f}  \t{4:.6f}\t {5:.6f}\t\t \t \t \t tp:{6}  fp:{7}  fn:{8}  tn:{9}'.format(baselineName,accuracy, precision, npv, recall, f1, tp,fp,fn,tn))
-
 
 
 def get_integrated_results(res_data, train, test, baslineName):

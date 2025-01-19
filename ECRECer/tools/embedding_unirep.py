@@ -6,7 +6,7 @@ from tqdm import tqdm
 from jax_unirep import get_reps
 import sys
 sys.path.append("../")
-import config as cfg
+import ECRECer.config as cfg
 
 
 def getunirep(enzyme_noemzyme, step):
