@@ -1,13 +1,76 @@
 import pandas as pd
 import numpy as np
 import os,string, random,joblib,sys
+sys.path.append(os.getcwd())
+
 from datetime import datetime
-import config as cfg
+import ECRECer.config as cfg
 from sklearn import preprocessing
 from keras.models import Model
 from keras.optimizers import Adam
 from keras.layers import Input, Dense, GRU, Bidirectional
-from tools import Attention
+from ECRECer.tools import Attention
+from ECRECer.tools import filetool as ftool
+
+def to_file_matrix(file, ds, col_num, stype='label'):
+    """[创建slice需要的数据文件]
+    Args:
+        file ([string]): [要保存的文件名]
+        ds ([DataFrame]): [数据]
+        col_num ([int]): [有多少列]
+        stype (str, optional): [文件类型：feature，label]. Defaults to 'label'.
+    """
+    if os.path.exists(file) & (cfg.UPDATE_MODEL ==False):
+        return 'file exist'
+    
+    if stype== 'label':
+        seps = ':'
+    if stype == 'feature':
+        seps = ' '
+    ds.to_csv(file, index= 0, header =0 , sep= seps)
+
+    cmd ='''sed -i '1i {0} {1}' {2}'''.format(len(ds), col_num, file)
+    os.system(cmd)
+
+def prepare_slice_file(x_data, y_data, x_file, y_file, ec_label_dict):
+    """
+    Args:
+        x_data: X数据
+        y_data: Y数据
+        x_file: X文件路径
+        y_file: Y文件路径
+        ec_label_dict: EC    
+
+    """
+    if (os.path.exists(x_file) == False) or (cfg.UPDATE_MODEL ==True):
+         to_file_matrix(file=x_file, ds=x_data.round(cfg.SAMPLING_BIT), col_num=cfg.FEATURE_NUM, stype='feature')
+
+    if (os.path.exists(y_file) == False) or (cfg.UPDATE_MODEL ==True):
+        with pd.option_context('mode.chained_assignment', None): 
+            y_data['tags'] = 1
+        to_file_matrix(
+            file=y_file,
+            ds=y_data,
+            col_num=max(ec_label_dict.values()),
+            stype='label'
+        )
+    print('slice files prepared success')
+   
+
+def prepare_slice_file_onlyx(x_data, x_file):
+    """
+    准备Slice使用的文件
+    Args:
+        x_data: X数据
+        x_file: X文件路径
+
+    Returns:
+
+    """
+    if (os.path.exists(x_file) == False) or (cfg.UPDATE_MODEL ==True):
+         to_file_matrix(file=x_file, ds=x_data.round(cfg.SAMPLING_BIT), col_num=cfg.FEATURE_NUM, stype='feature')
+
+    print('slice files prepared success')   
 
 
 # sortmax 结果转 onehot
@@ -19,8 +82,11 @@ def props_to_onehot(props):
     b[np.arange(len(a)), a] = 1
     return b
 
-def make_onehot_label(label_list, save=False, file_encoder='./encode.h5', type='singel'):
-    if type=='singel':
+def make_onehot_label(label_list, save=False, file_encoder='ECRECer/encode.h5', type='single'):
+    if not os.path.exists(file_encoder):
+        ftool.create_folder(os.path.dirname(file_encoder))
+        
+    if type=='single':
         encoder = preprocessing.OneHotEncoder(sparse=False)
         results = encoder.fit_transform([[item] for item in label_list])
         
@@ -33,6 +99,7 @@ def make_onehot_label(label_list, save=False, file_encoder='./encode.h5', type='
 
     if save ==True:
         joblib.dump(encoder, file_encoder)
+        print(f'encoder saved to {file_encoder}')
 
     return results
 
@@ -81,9 +148,9 @@ def getblast(ref_fasta, query_fasta, results_file):
         return res_data
 
 
-    cmd1 = r'diamond makedb --in {0} -d /tmp/train.dmnd'.format(ref_fasta)
-    cmd2 = r'diamond blastp -d /tmp/train.dmnd  -q  {0} -o {1} -b8 -c1 -k 1'.format(query_fasta, results_file)
-    cmd3 = r'rm -rf /tmp/*.dmnd'
+    cmd1 = r'diamond makedb --in {0} -d ECRECer/tmp/train.dmnd'.format(ref_fasta)
+    cmd2 = r'diamond blastp -d ECRECer/tmp/train.dmnd  -q  {0} -o {1} -b8 -c1 -k 1'.format(query_fasta, results_file)
+    cmd3 = r'rm -rf ECRECer/tmp/*.dmnd'
 
     print(cmd1)
     os.system(cmd1)
