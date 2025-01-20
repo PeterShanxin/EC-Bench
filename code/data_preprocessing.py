@@ -21,7 +21,7 @@ def read_txt_file(file_path):
     with open(file_path, 'r') as f:
         return f.readlines()
 
-def preprocessing(pretrain_path, train_path, test_path, price_path, ensemble_path):
+def preprocessing(data_path, pretrain_path, train_path, test_path, price_path, ensemble_path):
     # Read the price file
     price = pd.read_csv(price_path)
     
@@ -131,12 +131,12 @@ def preprocessing(pretrain_path, train_path, test_path, price_path, ensemble_pat
     if ensemble_path:
         ensemble = ensemble.iloc[:,np.r_[0,7,4]]
 
-    funclib.table2fasta(table=pretrain[['id', 'seq']], file_out='data/pretrain.fasta')
-    funclib.table2fasta(table=train[['id', 'seq']], file_out='data/train.fasta')
-    funclib.table2fasta(table=test[['id', 'seq']], file_out='data/test.fasta')
-    funclib.table2fasta(table=price[['id', 'seq']], file_out='data/price.fasta')
+    funclib.table2fasta(table=pretrain[['id', 'seq']], file_out=os.path.join(data_path, 'pretrain.fasta'))
+    funclib.table2fasta(table=train[['id', 'seq']], file_out= os.path.join(data_path, 'train.fasta'))
+    funclib.table2fasta(table=test[['id', 'seq']], file_out= os.path.join(data_path, 'test.fasta'))
+    funclib.table2fasta(table=price[['id', 'seq']], file_out= os.path.join(data_path, 'price-149.fasta'))
     if ensemble_path:
-        funclib.table2fasta(table=ensemble[['id', 'seq']], file_out='data/ensemble.fasta')
+        funclib.table2fasta(table=ensemble[['id', 'seq']], file_out= os.path.join(data_path, 'ensemble.fasta'))
  
 '''
 pretrain: 108,857,557
