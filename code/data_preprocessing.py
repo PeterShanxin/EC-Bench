@@ -10,6 +10,7 @@ from pandarallel import pandarallel
 from Bio import SeqIO
 pandarallel.initialize(progress_bar=True)
 
+# We use ECRECer to preprocess the data: https://github.com/kingstdio/ECRECer
 def create_tsv_from_data(data_path):
     for file in os.listdir(data_path):
         if file.endswith('.data.gz'):
