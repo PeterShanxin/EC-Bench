@@ -23,7 +23,7 @@ def read_txt_file(file_path):
 
 def preprocessing(pretrain_path, train_path, test_path, price_path, ensemble_path):
     # Read the price file
-    price = pd.read_csv(price_path, header=0)
+    price = pd.read_csv(price_path)
     
     pretrain_data = pd.read_csv(pretrain_path, sep='\t', header=0)
     pretrain_data = mtool.convert_DF_dateTime(inputdf=pretrain_data)
@@ -155,13 +155,13 @@ def count_protein_number(fasta_file):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Data merging script')
     parser.add_argument('--data_path', type=str, help='Path to the folder containing the data files')
-    parser.add_argument('--pretrain_path', type=str, help='Path to the pretrain data')
-    parser.add_argument('--train_path', type=str, help='Path to the train data')
-    parser.add_argument('--test_path', type=str, help='Path to the test data')
-    parser.add_argument('--price_path', type=str, help='Path to the price data')
-    parser.add_argument('--ensemble_path', type=str, help='Path to the ensemble data', default=None)
+    parser.add_argument('--pretrain_name', type=str, help='name of pretrain data')
+    parser.add_argument('--train_name', type=str, help='name of the train data')
+    parser.add_argument('--test_name', type=str, help='name of the test data')
+    parser.add_argument('--price_name', type=str, help='name of the price data')
+    parser.add_argument('--ensemble_name', type=str, help='name of the ensemble data', default=None)
     args = parser.parse_args()
 
     # run following functions in order; comment out the functions that have been run
     create_tsv_from_data(data_path=args.data_path)
-    preprocessing(pretrain_path=args.pretrain_path, train_path=args.train_path, test_path=args.test_path, price_path=args.price_path, ensemble_path=args.ensemble_path)
+    preprocessing(pretrain_path=args.data_path + args.pretrain_path, train_path=args.data_path + args.train_path, test_path=args.data_path + args.test_path, price_path=args.data_path + args.price_path, ensemble_path=args.data_path + args.ensemble_path)

@@ -1,2 +1,2 @@
 #!/bin/bash
-python3 code/data_preprocessing.py --pretrain_path data/pretrain.fasta --train_path data/train.fasta --test_path data/test.fasta --price_path data/price.fasta --info_file_path data/swissprot_coordinates.json &> data_coordinates.log
+python3 code/data_preprocessing.py --data_path data --pretrain_path uniprot_trembl2018_02.tsv --train_path uniprot_sprot2018_02.tsv --test_path uniprot_sprot2023_01.tsv --price_path price-149.csv --ensemble_path uniprot_sprot2023_02.tsv  &> data_preprocessing.log
