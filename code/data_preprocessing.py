@@ -3,36 +3,27 @@ import pandas as pd
 import sys,os
 sys.path.append(os.getcwd())
 import argparse
-from ECRECer.tools import filetool as ftool
 from ECRECer.tools import exact_ec_from_uniprot as exactec
 from ECRECer.tools import funclib
 from ECRECer.tools import minitools as mtool
 from pandarallel import pandarallel
 from Bio import SeqIO
-import json
 pandarallel.initialize(progress_bar=True)
 
-def create_tsv_from_data():
-    for file in os.listdir('data'):
+def create_tsv_from_data(data_path):
+    for file in os.listdir(data_path):
         if file.endswith('.data.gz'):
             print(file)
-            exactec.run_exact_task(infile=f'data/{file}', outfile=f'data/{file}.tsv')
+            exactec.run_exact_task(infile=os.path.join(data_path, file), outfile=os.path.join(data_path, file.replace('.data.gz', '.tsv')))
 
 def read_txt_file(file_path):
     with open(file_path, 'r') as f:
         return f.readlines()
 
-def preprocessing(pretrain_path, train_path, test_path, price_path):
+def preprocessing(pretrain_path, train_path, test_path, price_path, ensemble_path):
     # Read the price file
     price = pd.read_csv(price_path, header=0)
-    price.drop_duplicates(subset=['id', 'seq'], keep='first', inplace=True)
-    price.reset_index(drop=True, inplace=True)
-    price['ec_number'] = price.ec_number.parallel_apply(lambda x: mtool.format_ec(x))
-    price['ec_number'] = price.ec_number.parallel_apply(lambda x: mtool.specific_ecs(x))
-    price['functionCounts'] = price.ec_number.parallel_apply(lambda x: 0 if x=='-' else len(x.split(',')))
-    print('price finished')
-    price.to_feather('data/snp_price.feather')
-
+    
     pretrain_data = pd.read_csv(pretrain_path, sep='\t', header=0)
     pretrain_data = mtool.convert_DF_dateTime(inputdf=pretrain_data)
     pretrain_data.drop_duplicates(subset=['id', 'seq'], keep='first', inplace=True)
@@ -42,7 +33,6 @@ def preprocessing(pretrain_path, train_path, test_path, price_path):
     pretrain_data['ec_number'] = pretrain_data.ec_number.parallel_apply(lambda x: mtool.specific_ecs(x))
     pretrain_data['functionCounts'] = pretrain_data.ec_number.parallel_apply(lambda x: 0 if x=='-' else len(x.split(',')))
     print('pretrain_data finished')
-    pretrain_data.to_feather('data/snp_pretrain_data.feather')
     pretrain = pretrain_data.iloc[:,np.r_[0,2:8,10:12]]
 
     del pretrain_data
@@ -56,10 +46,23 @@ def preprocessing(pretrain_path, train_path, test_path, price_path):
     train_data['ec_number'] = train_data.ec_number.parallel_apply(lambda x: mtool.specific_ecs(x))
     train_data['functionCounts'] = train_data.ec_number.parallel_apply(lambda x: 0 if x=='-' else len(x.split(',')))
     print('train_data finished')
-    train_data.to_feather('data/snp_train_data.feather')
     train = train_data.iloc[:,np.r_[0,2:8,10:12]]
 
     del train_data
+
+    if ensemble_path:
+        ensemble_data = pd.read_csv(ensemble_path, sep='\t', header=0)
+        ensemble_data = mtool.convert_DF_dateTime(inputdf=ensemble_data)
+        ensemble_data.drop_duplicates(subset=['id', 'seq'], keep='first', inplace=True)
+        ensemble_data.reset_index(drop=True, inplace=True)
+
+        ensemble_data['ec_number'] = ensemble_data.ec_number.parallel_apply(lambda x: mtool.format_ec(x))
+        ensemble_data['ec_number'] = ensemble_data.ec_number.parallel_apply(lambda x: mtool.specific_ecs(x))
+        ensemble_data['functionCounts'] = ensemble_data.ec_number.parallel_apply(lambda x: 0 if x=='-' else len(x.split(',')))
+        print('ensemble_data finished')
+        ensemble = ensemble_data.iloc[:,np.r_[0,2:8,10:12]]
+
+        del ensemble_data
 
     test_data = pd.read_csv(test_path, sep='\t', header=0)
     test_data = mtool.convert_DF_dateTime(inputdf=test_data)
@@ -70,7 +73,6 @@ def preprocessing(pretrain_path, train_path, test_path, price_path):
     test_data['ec_number'] = test_data.ec_number.parallel_apply(lambda x: mtool.specific_ecs(x))
     test_data['functionCounts'] = test_data.ec_number.parallel_apply(lambda x: 0 if x=='-' else len(x.split(',')))
     print('test_data finished')
-    test_data.to_feather('data/snp_test_data.feather')
     test = test_data.iloc[:,np.r_[0,2:8,10:12]]
 
     del test_data
@@ -79,15 +81,29 @@ def preprocessing(pretrain_path, train_path, test_path, price_path):
     test =test[~test.seq.isin(pretrain.seq)]
     test.reset_index(drop=True, inplace=True) 
 
-    # Remove changed seqence in test set
+    # Remove changed seqences from test set
     test = test[~test.id.isin(test.merge(pretrain, on='id', how='inner').id.values)]
     test = test[~test.id.isin(test.merge(train, on='id', how='inner').id.values)]
     test.reset_index(drop=True, inplace=True)
 
+    # Remove changed seqences from pretrain set, train set, and ensemble set
     pretrain = pretrain[~pretrain.id.isin(pretrain.merge(price, on='id', how='inner').id.values)]
     train = train[~train.id.isin(train.merge(price, on='id', how='inner').id.values)]
     train.reset_index(drop=True, inplace=True)
     pretrain.reset_index(drop=True, inplace=True)
+
+    if ensemble_path:
+        ensemble = ensemble[~ensemble.seq.isin(train.seq)]
+        ensemble = ensemble[~ensemble.seq.isin(pretrain.seq)]
+        ensemble = ensemble[~ensemble.seq.isin(test.seq)]
+        ensemble = ensemble[~ensemble.seq.isin(price.seq)]
+        ensemble.reset_index(drop=True, inplace=True)
+
+        ensemble = ensemble[~ensemble.id.isin(test.id.values)]
+        ensemble = ensemble[~ensemble.id.isin(train.id.values)]
+        ensemble = ensemble[~ensemble.id.isin(pretrain.id.values)]
+        ensemble = ensemble[~ensemble.id.isin(price.id.values)]
+        ensemble.reset_index(drop=True, inplace=True)
 
     # Trim sequences
     with pd.option_context('mode.chained_assignment', None):
@@ -102,64 +118,31 @@ def preprocessing(pretrain_path, train_path, test_path, price_path):
 
         price.ec_number = price.ec_number.parallel_apply(lambda x : str(x).strip())
         price.seq = price.seq.parallel_apply(lambda x : str(x).strip())
-        
-    pretrain.to_feather('data/pretrain.feather')
-    train.to_feather('data/train.feather')
-    test.to_feather('data/test.feather')
 
+        if ensemble_path:
+            ensemble.ec_number = ensemble.ec_number.parallel_apply(lambda x : str(x).strip())
+            ensemble.seq = ensemble.seq.parallel_apply(lambda x : str(x).strip())
+   
     # Create EC number prediction data
     pretrain = pretrain.iloc[:,np.r_[0,7,4]]
     train = train.iloc[:,np.r_[0,7,4]]
     test = test.iloc[:,np.r_[0,7,4]]
-
-    pretrain.to_feather('data/pretrain_ec.feather')
-    train.to_feather('data/train_ec.feather')
-    test.to_feather('data/test_ec.feather')
-    price.to_feather('data/price.feather')
+    if ensemble_path:
+        ensemble = ensemble.iloc[:,np.r_[0,7,4]]
 
     funclib.table2fasta(table=pretrain[['id', 'seq']], file_out='data/pretrain.fasta')
     funclib.table2fasta(table=train[['id', 'seq']], file_out='data/train.fasta')
     funclib.table2fasta(table=test[['id', 'seq']], file_out='data/test.fasta')
     funclib.table2fasta(table=price[['id', 'seq']], file_out='data/price.fasta')
+    if ensemble_path:
+        funclib.table2fasta(table=ensemble[['id', 'seq']], file_out='data/ensemble.fasta')
  
-
-# Check if we have 3d information for all train and test data
-def check_3d_information(train_path, test_path, price_path, info_file_path):
-    # get the protein ids from fasta files using biopython
-    train_ids = [record.id for record in SeqIO.parse(train_path, 'fasta')]
-    test_ids = [record.id for record in SeqIO.parse(test_path, 'fasta')]
-    price_ids = [record.id for record in SeqIO.parse(price_path, 'fasta')]
-
-    # get the ids from json info_file
-    with open(info_file_path, 'r') as f:
-        info = json.load(f)
-        info_ids = list(info.keys())
-    
-    # check if all ids are in the info file
-    train_ids = list(set(train_ids).intersection(set(info_ids)))
-    test_ids = list(set(test_ids).intersection(set(info_ids)))
-    price_ids = list(set(price_ids).intersection(set(info_ids)))
-                     
-    print(f'Number of train ids in info file: {len(train_ids)}')
-    print(f'Number of test ids in info file: {len(test_ids)}')
-    print(f'Number of price ids in info file: {len(price_ids)}')
-
-    # exclude ids not in info file from train and test fasta data and save them to new files 
-    SeqIO.write((record for record in SeqIO.parse(train_path, 'fasta') if record.id in train_ids), 'data/train_having_3d.fasta', 'fasta')
-    SeqIO.write((record for record in SeqIO.parse(test_path, 'fasta') if record.id in test_ids), 'data/test_having_3d.fasta', 'fasta')
-    SeqIO.write((record for record in SeqIO.parse(price_path, 'fasta') if record.id in price_ids), 'data/price_having_3d.fasta', 'fasta')
-
-
 '''
 pretrain: 108,857,557
 train: 556,822
 test: 2601
 price: 184
 all: 109417164
-----------------------------------------
-Number of train ids with 3d info: 534,093
-Number of test ids with 3d info: 1536
-Number of price ids with 3d info: 3
 '''
 def count_protein_number(fasta_file):
     count = 0
@@ -170,15 +153,14 @@ def count_protein_number(fasta_file):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Data merging script')
+    parser.add_argument('--data_path', type=str, help='Path to the folder containing the data files')
     parser.add_argument('--pretrain_path', type=str, help='Path to the pretrain data')
     parser.add_argument('--train_path', type=str, help='Path to the train data')
     parser.add_argument('--test_path', type=str, help='Path to the test data')
     parser.add_argument('--price_path', type=str, help='Path to the price data')
-    parser.add_argument('--info_file_path', type=str, help='Path to the 3d coordinates file')
+    parser.add_argument('--ensemble_path', type=str, help='Path to the ensemble data', default=None)
     args = parser.parse_args()
 
     # run following functions in order; comment out the functions that have been run
-    create_tsv_from_data()
-    preprocessing(pretrain_path=args.pretrain_path, train_path=args.train_path, test_path=args.test_path, price_path=args.price_path)
-    check_3d_information(train_path=args.train_path, test_path=args.test_path, price_path= args.price_path, info_file_path=args.info_file_path)
-
+    create_tsv_from_data(data_path=args.data_path)
+    preprocessing(pretrain_path=args.pretrain_path, train_path=args.train_path, test_path=args.test_path, price_path=args.price_path, ensemble_path=args.ensemble_path)
