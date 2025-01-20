@@ -3,7 +3,6 @@
 *.tsv
 *.pkl
 *.h5
-*.json
 *.gz
 *.zip
 *.tar

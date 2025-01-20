@@ -1,0 +1,65 @@
+{
+    "type": "fine_tuning",
+    "starting_model": {
+        "type": "from_pre_trained",
+        "path_model": "pre_trained_models/30_layer_uniparc+BFD/model_embedder.pth",
+        "path_vocab": "pre_trained_models/30_layer_uniparc+BFD/vocab.pkl"
+    },
+    "log_and_save": {
+        "type": "nb_time_per_epoch",
+        "log": 5,
+        "save": 2,
+        "frequency_train_metrics": 0.1
+    },
+    "training_strategy": "classic",
+    "tasks": [
+        {
+            "unique_task_name": "classif_EC_pred_lvl_4",
+            "batch_size": 2,
+            "theorical_batch_size": 32,
+            "limit_size_input_prot": 1024,
+            "data_path": "mine_100_task3",
+            "dataset_type": {
+                "name": "Classification_per_prot_dataset",
+                "params": []
+            },
+            "balanced_dataset":true,
+            "col_name_input": "sequence",
+            "col_name_output": "ec_number",
+            "model": {
+                "name": "Transformer_classif_per_prot_layer_norm",
+                "params": [
+                    0.2
+                ]
+            },
+            "loss": {
+                "name": "CrossEntropy",
+                "param": ""
+            },
+            "optimizer": {
+                "name": "Adam",
+                "lr": 0.00001
+            },
+            "lr_scheduler": {
+                "name": "StepLR",
+                "params": [
+                    1,
+                    0.8
+                ]
+            },
+            "metrics": [
+                {
+                    "name": "accuracy",
+                    "converter": "proba_to_pred"
+                }
+            ],
+            "save_even_if_worse": false,
+            "stoping_criteria": {
+                "name": "nb_epoch",
+                "params": [
+                    15
+                ]
+            }
+        }
+    ]
+}
