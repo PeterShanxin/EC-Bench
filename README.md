@@ -1,4 +1,4 @@
-# GLM4EC : Generalized Language Model for Enzyme Commission (EC) Number Prediction and Benchmarking
+# EC-Bench : A Benchmark for Enzyme Commission (EC) Number Prediction
 ## Table of Contents
 
 - [Installation](#installation)
@@ -26,7 +26,7 @@ pip install -r requirements.txt
 ## Usage
 1. Clone the repository  
 ```
-git clone https://github.com/dsaeedeh/GLM4EC.git
+git clone https://github.com/dsaeedeh/EC-Bench.git
 ```
 2. Run download_data.sh to download the data
 3. Run extract_coordinates.sh to extract the coordinates from pdb files 
@@ -37,22 +37,17 @@ We need all.fasta file to run mmseqs2 on it!
 
 ## Models
 List of models:
-1. GLM4EC
+1. ProteinBERT
 2. DeepEC
 3. ECPred
 4. DeepECtransformer
-5. TFPC
+5. EnzBERT
 6. ECRECer
 7. CLEAN
 8. BLASTp
 9. CatFam
 10. PRIAMv2
 
-Run the following command to train and test the models:
-```
-python main.py --model_name GLM4EC --train --test
-```
-To test the models, you need to download the pretrained models from [here]() and put them in the models directory.
 ## Contributing
 
 ## License
