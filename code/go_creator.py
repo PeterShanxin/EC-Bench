@@ -1,8 +1,18 @@
 import pandas as pd
 import ahocorasick
 import pickle
+import urllib
+import gzip
 
-def filter_columns(input_file = 'goa_uniprot_all.gaf', output_file = 'filtered_goa.csv'):
+# download go from: https://ftp.ebi.ac.uk/pub/databases/GO/goa/UNIPROT/goa_uniprot_all.gaf.gz and extract it
+url = 'https://ftp.ebi.ac.uk/pub/databases/GO/goa/UNIPROT/goa_uniprot_all.gaf.gz'
+# download the file from the url and save it as 'goa_uniprot_all.gaf'
+urllib.request.urlretrieve(url, 'data/goa_uniprot_all.gaf.gz')
+with gzip.open('data/goa_uniprot_all.gaf.gz', 'rb') as f_in:
+    with open('data/goa_uniprot_all.gaf', 'wb') as f_out:
+        f_out.write(f_in.read())
+
+def filter_columns(input_file = 'data/goa_uniprot_all.gaf', output_file = 'data/filtered_goa.csv'):
 
     column_names = [
         'DB', 'DB_Object_ID', 'DB_Object_Symbol', 'Qualifier', 'GO_ID', 
