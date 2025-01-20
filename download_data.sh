@@ -1,2 +1,2 @@
 #!/bin/bash
-python3 code/download_data.py 2023 01 2018 02
+python3 code/download_data.py 2023 01 2018 02 2023 02
