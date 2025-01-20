@@ -24,20 +24,19 @@ We need all.fasta file to run mmseqs2 on it!
 6. Run create_data.sh to create the final data for pretraining, training, and testing
 
 ## Models
-## Models
 
-| Model Name        | Link                        |
-|-------------------|------------------------------------|
-| ProteinBERT       | [GitHub](https://github.com/nadavbra/protein_bert) |
-| DeepEC            | [GitHub](https://bitbucket.org/kaistsystemsbiology/deepec/src/master/) |
-| ECPred            | [GitHub](https://github.com/cansyl/ECPred) |
-| DeepECtransformer | [GitHub](https://github.com/kaistsystemsbiology/DeepProZyme) |
-| EnzBERT           | [GitHub](https://gitlab.inria.fr/nbuton/tfpc) |
-| ECRECer           | [GitHub](https://github.com/kingstdio/ECRECer) |
-| CLEAN             | [GitHub](https://github.com/tttianhao/CLEAN) |
-| BLASTp            | [GitHub](https://github.com/bbuchfink/diamond/wiki) |
-| CatFam            | [GitHub]() |
-| PRIAMv2           | [GitHub]() |
+| Model Name        | Link                                                        | Year |
+|-------------------|------------------------------------------------------------|------|
+| ProteinBERT       | [LINK](https://github.com/nadavbra/protein_bert)         |  2022    |
+| DeepEC            | [LINK](https://bitbucket.org/kaistsystemsbiology/deepec/src/master/) |   2018   |
+| ECPred            | [LINK](https://github.com/cansyl/ECPred)                 |  2018    |
+| DeepECtransformer | [LINK](https://github.com/kaistsystemsbiology/DeepProZyme) |   2023   |
+| EnzBERT           | [LINK](https://gitlab.inria.fr/nbuton/tfpc)              |   2023   |
+| ECRECer           | [LINK](https://github.com/kingstdio/ECRECer)             |  2022    |
+| CLEAN             | [LINK](https://github.com/tttianhao/CLEAN)               |  2023    |
+| BLASTp            | [LINK](https://github.com/bbuchfink/diamond/wiki)        |  2008    |
+| CatFam            | [LINK](http://www.bhsai.org/downloads/catfam.tar.gz)     |  2008    |
+| PRIAM           | [LINK](http://priam.prabi.fr/REL_JAN18/Distribution.zip)   |  2013    |
 
 
 ## Contributing
