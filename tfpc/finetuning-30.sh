@@ -1,0 +1,1 @@
+python3 training.py data/models/fine_tune_models/mine_30_task3/config.json
