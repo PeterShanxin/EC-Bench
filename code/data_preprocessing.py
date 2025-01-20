@@ -1,21 +1,16 @@
 import numpy as np
 import pandas as pd
 import sys,os
-from tqdm import tqdm
 sys.path.append(os.getcwd())
 import argparse
-from functools import reduce
 from ECRECer.tools import filetool as ftool
 from ECRECer.tools import exact_ec_from_uniprot as exactec
 from ECRECer.tools import funclib
 from ECRECer.tools import minitools as mtool
-from ECRECer.tools import embdding_onehot as onehotebd
 from pandarallel import pandarallel
 from Bio import SeqIO
 import json
-
 pandarallel.initialize(progress_bar=True)
-
 
 def create_tsv_from_data():
     for file in os.listdir('data'):
@@ -186,27 +181,4 @@ if __name__ == '__main__':
     create_tsv_from_data()
     preprocessing(pretrain_path=args.pretrain_path, train_path=args.train_path, test_path=args.test_path, price_path=args.price_path)
     check_3d_information(train_path=args.train_path, test_path=args.test_path, price_path= args.price_path, info_file_path=args.info_file_path)
-
-    # Count the number of proteins in a fasta file using biopython
-    #count_pretrain = count_protein_number('data/pretrain.fasta')
-    #count_train = count_protein_number('data/train.fasta')
-    #count_test = count_protein_number('data/test.fasta')
-    #count_price = count_protein_number('data/price.fasta')
-    #count_all = count_protein_number('data/all.fasta')
-
-    #print(f'pretrain: {count_pretrain}')
-    #print(f'train: {count_train}')
-    #print(f'test: {count_test}')
-    #print(f'price: {count_price}')
-    #print(f'all: {count_all}')
-
-    # read a tsv file and keep id and ec_number columns
-    # data = pd.read_csv('data/uniprot_sprot_2024_03.tsv', sep='\t')
-    # data = data[['id', 'seq', 'ec_number']]
-    # data = data[data['ec_number'] != '-']
-    # data = data.drop_duplicates()
-    # data.to_csv('data/uniprot_sprot_2024_03.csv', index=False)
-
-    
-
 

@@ -1,17 +1,10 @@
-import numpy as np
 import pandas as pd
 import sys,os
-from tqdm import tqdm
 sys.path.append(os.getcwd())
-import argparse
 from ECRECer.tools import filetool as ftool
-from ECRECer.tools import exact_ec_from_uniprot as exactec
 from ECRECer.tools import funclib
-from ECRECer.tools import minitools as mtool
-from ECRECer.tools import embdding_onehot as onehotebd
 from pandarallel import pandarallel
 from ECRECer.tools import embedding_esm as esmebd
-from ECRECer.tools import embedding_unirep as unirep
 
 
 pandarallel.initialize(progress_bar=True)
@@ -23,51 +16,7 @@ def read_data(cluster_path, price_path):
     price = pd.read_csv(price_path, header=0)
     return train, test, price
 
-# Task 1 - prepare data for enzyme vs non enzyme classification task: 
-# Create a new column named isenzyme if EC number is '-' then put this column False, else True
-# Then remove EC_number column from the dataset
-def prepare_task1_data(cluster_path, price_path, save_path):
-    train, test, price = read_data(cluster_path, price_path)
-    train['isenzyme'] = train['ec_number'].apply(lambda x: False if x == '-' else True)
-    test['isenzyme'] = test['ec_number'].apply(lambda x: False if x == '-' else True)
-    price['isenzyme'] = price['ec_number'].apply(lambda x: False if x == '-' else True)
-    train.drop(['ec_number'], axis=1, inplace=True)
-    test.drop(['ec_number'], axis=1, inplace=True)
-    price.drop(['ec_number'], axis=1, inplace=True)
-    train.to_csv(save_path + '/train_task1.csv', index=False)
-    test.to_csv(save_path + '/test_task1.csv', index=False)
-    price.to_csv(save_path + '/price_task1.csv', index=False)
-    train.to_feather(save_path + '/train_task1.feather')
-    test.to_feather(save_path + '/test_task1.feather')
-    price.to_feather(save_path + '/price_task1.feather')
-
-    funclib.table2fasta(table=train[['id', 'seq']], file_out=save_path + '/train_task1.fasta')
-    funclib.table2fasta(table=test[['id', 'seq']], file_out=save_path + '/test_task1.fasta')
-    funclib.table2fasta(table=price[['id', 'seq']], file_out=save_path + '/price_task1.fasta')
-    
-# Task 2 - prepare data for counting EC numbers task:
-# Create a new column named functionCounts and count the number of EC numbers in the EC_number column
-# Then remove EC_number column from the dataset
-def prepare_task2_data(cluster_path, price_path, save_path):
-    train, test, price = read_data(cluster_path, price_path)
-    train['functionCounts'] = train['ec_number'].apply(lambda x: len(x.split(',')) if x != '-' else 0)
-    test['functionCounts'] = test['ec_number'].apply(lambda x: len(x.split(',')) if x != '-' else 0)
-    price['functionCounts'] = price['ec_number'].apply(lambda x: len(x.split(',')) if x != '-' else 0)
-    train.drop(['ec_number'], axis=1, inplace=True)
-    test.drop(['ec_number'], axis=1, inplace=True)
-    price.drop(['ec_number'], axis=1, inplace=True)
-    train.to_csv(save_path + '/train_task2.csv', index=False)
-    test.to_csv(save_path + '/test_task2.csv', index=False)
-    price.to_csv(save_path + '/price_task2.csv', index=False)
-    train.to_feather(save_path + '/train_task2.feather')
-    test.to_feather(save_path + '/test_task2.feather')
-    price.to_feather(save_path + '/price_task2.feather')
-
-    funclib.table2fasta(table=train[['id', 'seq']], file_out=save_path + '/train_task2.fasta')
-    funclib.table2fasta(table=test[['id', 'seq']], file_out=save_path + '/test_task2.fasta')
-    funclib.table2fasta(table=price[['id', 'seq']], file_out=save_path + '/price_task2.fasta')
-
-# Task 3 - prepare data for EC number prediction task; no changes needed just save the data in save_path
+# prepare data for EC number prediction task; no changes needed just save the data in save_path
 def prepare_task3_data(cluster_path, price_path, save_path):    
     train, test, price = read_data(cluster_path, price_path)
     train.to_csv(save_path + '/train_task3.csv', index=False)
@@ -109,9 +58,9 @@ def main():
     # read cluster paths
     cluster_paths = ['data/cluster-30', 'data/cluster-50', 'data/cluster-70', 'data/cluster-90', 'data/cluster-100']
     # read price path
-    price_path = 'data/price.csv'
+    price_path = 'data/price-149.csv'
     # create save paths
-    save_paths = ['ECRECer/data/datasets/task1', 'ECRECer/data/datasets/task2', 'ECRECer/data/datasets/task3']
+    save_paths = ['ECRECer/data/datasets/task3']
     # prepare data for each cluster
     for save_path in save_paths:
         for cluster_path in cluster_paths: 
@@ -119,16 +68,11 @@ def main():
             print('Preparing data for cluster ', cluster_name)
             # create save path if not exists
             ftool.create_folder(save_path+'/'+cluster_name)
-            task_name = save_path.split('/')[-1]
-            if task_name == 'task1':
-                prepare_task1_data(cluster_path, price_path, save_path+'/'+cluster_name)
-            elif task_name == 'task2':    
-                prepare_task2_data(cluster_path, price_path, save_path+'/'+cluster_name)
-            else:
-                prepare_task3_data(cluster_path, price_path, save_path+'/'+cluster_name)
+            prepare_task3_data(cluster_path, price_path, save_path+'/'+cluster_name)
 
 if __name__ == "__main__":
     esm_embedding()
+    main()
 
 
 
