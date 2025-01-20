@@ -16,12 +16,7 @@
 *.fasta
 *.fastq
 *.pdb
-**/ECPred/lib
-**/ECPred/temp
-**/ECPred
-**/PenLight
 *.pt
-**/PenLight/esm
 *.jpg
 *.png
 *.jpeg
