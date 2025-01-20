@@ -9,25 +9,13 @@
 
 ## Installation
 1. Install [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/)
-2. Create a conda environment with python 3.7
-```
-conda create -n glm4ec python=3.7
-```
-3. Activate the environment
-```
-conda activate glm4ec
-```
-4. Install requirements
-```
-pip install -r requirements.txt
-```
-5. Install [mmseqs2](https://github.com/soedinglab/MMseqs2)
 
 ## Usage
 1. Clone the repository  
 ```
 git clone https://github.com/dsaeedeh/EC-Bench.git
 ```
+### Data Preparation
 2. Run download_data.sh to download the data
 3. Run extract_coordinates.sh to extract the coordinates from pdb files 
 4. run data_preprocessing.sh 
