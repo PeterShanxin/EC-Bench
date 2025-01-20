@@ -7,7 +7,6 @@ from ECRECer.tools import exact_ec_from_uniprot as exactec
 from ECRECer.tools import funclib
 from ECRECer.tools import minitools as mtool
 from pandarallel import pandarallel
-from Bio import SeqIO
 pandarallel.initialize(progress_bar=True)
 
 # We use ECRECer to preprocess the data: https://github.com/kingstdio/ECRECer
