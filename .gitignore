@@ -2,7 +2,6 @@
 *.txt
 *.tsv
 *.pkl
-*.csv
 *.h5
 *.json
 *.gz
@@ -12,8 +11,6 @@
 *.xml
 *.feather
 *.xlsx
-**/data
-*.fasta
 *.fastq
 *.pdb
 *.pt
