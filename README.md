@@ -24,17 +24,21 @@ We need all.fasta file to run mmseqs2 on it!
 6. Run create_data.sh to create the final data for pretraining, training, and testing
 
 ## Models
-List of models:
-1. ProteinBERT
-2. DeepEC
-3. ECPred
-4. DeepECtransformer
-5. EnzBERT
-6. ECRECer
-7. CLEAN
-8. BLASTp
-9. CatFam
-10. PRIAMv2
+## Models
+
+| Model Name        | Link                        |
+|-------------------|------------------------------------|
+| ProteinBERT       | [GitHub](https://github.com/nadavbra/protein_bert) |
+| DeepEC            | [GitHub](https://bitbucket.org/kaistsystemsbiology/deepec/src/master/) |
+| ECPred            | [GitHub](https://github.com/cansyl/ECPred) |
+| DeepECtransformer | [GitHub](https://github.com/kaistsystemsbiology/DeepProZyme) |
+| EnzBERT           | [GitHub](https://gitlab.inria.fr/nbuton/tfpc) |
+| ECRECer           | [GitHub](https://github.com/kingstdio/ECRECer) |
+| CLEAN             | [GitHub](https://github.com/tttianhao/CLEAN) |
+| BLASTp            | [GitHub](https://github.com/bbuchfink/diamond/wiki) |
+| CatFam            | [GitHub]() |
+| PRIAMv2           | [GitHub]() |
+
 
 ## Contributing
 
