@@ -77,6 +77,20 @@ def preprocessing(data_path, pretrain_path, train_path, test_path, price_path, e
 
     del test_data
 
+    # remove sequences with no EC number
+    pretrain = pretrain[pretrain.ec_number != '-']
+    train = train[train.ec_number != '-']
+    test = test[test.ec_number != '-']
+    if ensemble_path:
+        ensemble = ensemble[ensemble.ec_number != '-']
+
+    # remove sequences with length less than 50
+    pretrain = pretrain[pretrain.seq.str.len() >= 50]
+    train = train[train.seq.str.len() >= 50]
+    test = test[test.seq.str.len() >= 50]
+    if ensemble_path:
+        ensemble = ensemble[ensemble.seq.str.len() >= 50]
+
     test =test[~test.seq.isin(train.seq)]
     test =test[~test.seq.isin(pretrain.seq)]
     test.reset_index(drop=True, inplace=True) 
@@ -93,15 +107,11 @@ def preprocessing(data_path, pretrain_path, train_path, test_path, price_path, e
     pretrain.reset_index(drop=True, inplace=True)
 
     if ensemble_path:
-        ensemble = ensemble[~ensemble.seq.isin(train.seq)]
-        ensemble = ensemble[~ensemble.seq.isin(pretrain.seq)]
         ensemble = ensemble[~ensemble.seq.isin(test.seq)]
         ensemble = ensemble[~ensemble.seq.isin(price.seq)]
         ensemble.reset_index(drop=True, inplace=True)
 
         ensemble = ensemble[~ensemble.id.isin(test.id.values)]
-        ensemble = ensemble[~ensemble.id.isin(train.id.values)]
-        ensemble = ensemble[~ensemble.id.isin(pretrain.id.values)]
         ensemble = ensemble[~ensemble.id.isin(price.id.values)]
         ensemble.reset_index(drop=True, inplace=True)
 
@@ -142,6 +152,16 @@ def preprocessing(data_path, pretrain_path, train_path, test_path, price_path, e
     if ensemble_path:
         funclib.table2fasta(table=ensemble[['id', 'seq']], file_out= os.path.join(data_path, 'ensemble.fasta'))
         ensemble.to_csv(os.path.join(data_path, 'ensemble.csv'), index=False)
+
+    # print the number of sequences in each dataset
+    print('Number of sequences in pretrain data:', pretrain.shape[0])
+    print('Number of sequences in train data:', train.shape[0])
+    print('Number of sequences in test data:', test.shape[0])
+    if ensemble_path:
+        print('Number of sequences in ensemble data:', ensemble.shape[0])
+    print('Number of sequences in price data:', price.shape[0])
+    print('Data preprocessing finished')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Data merging script')
