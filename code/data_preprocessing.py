@@ -134,8 +134,14 @@ def preprocessing(data_path, pretrain_path, train_path, test_path, price_path, e
     funclib.table2fasta(table=train[['id', 'seq']], file_out= os.path.join(data_path, 'train.fasta'))
     funclib.table2fasta(table=test[['id', 'seq']], file_out= os.path.join(data_path, 'test.fasta'))
     funclib.table2fasta(table=price[['id', 'seq']], file_out= os.path.join(data_path, 'price-149.fasta'))
+
+    # save the data to csv files
+    pretrain.to_csv(os.path.join(data_path, 'pretrain.csv'), index=False)
+    train.to_csv(os.path.join(data_path, 'train.csv'), index=False)
+    test.to_csv(os.path.join(data_path, 'test.csv'), index=False)
     if ensemble_path:
         funclib.table2fasta(table=ensemble[['id', 'seq']], file_out= os.path.join(data_path, 'ensemble.fasta'))
+        ensemble.to_csv(os.path.join(data_path, 'ensemble.csv'), index=False)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Data merging script')
@@ -149,4 +155,4 @@ if __name__ == '__main__':
 
     # run following functions in order; comment out the functions that have been run
     create_tsv_from_data(data_path=args.data_path)
-    preprocessing(pretrain_path=args.data_path + args.pretrain_path, train_path=args.data_path + args.train_path, test_path=args.data_path + args.test_path, price_path=args.data_path + args.price_path, ensemble_path=args.data_path + args.ensemble_path)
+    preprocessing(data_path=args.data_path, pretrain_path=os.path.join(args.data_path, args.pretrain_name), train_path=os.path.join(args.data_path, args.train_name), test_path=os.path.join(args.data_path, args.test_name), price_path=os.path.join(args.data_path, args.price_name), ensemble_path=os.path.join(args.data_path, args.ensemble_name))

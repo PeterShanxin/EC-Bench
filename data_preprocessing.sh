@@ -1,2 +1,2 @@
 #!/bin/bash
-python3 code/data_preprocessing.py --data_path data --pretrain_path uniprot_trembl2018_02.tsv --train_path uniprot_sprot2018_02.tsv --test_path uniprot_sprot2023_01.tsv --price_path price-149.csv --ensemble_path uniprot_sprot2023_02.tsv  &> data_preprocessing.log
+python3 code/data_preprocessing.py --data_path data --pretrain_name uniprot_trembl2018_02.tsv --train_name uniprot_sprot2018_02.tsv --test_name uniprot_sprot2023_01.tsv --price_name price-149.csv --ensemble_name uniprot_sprot2023_02.tsv  &> data_preprocessing.log
