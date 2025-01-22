@@ -16,10 +16,31 @@
 git clone https://github.com/dsaeedeh/EC-Bench.git
 ```
 ### Data Preparation
-1. Run download_data.sh to download the data
-2. run data_preprocessing.sh 
-3. Run run_mmseqs2.sh to concat fasta files (pretrain.fasta, train.fasta and test.fasta). Be sure no other .fasta files are existed in the data directory
-We need all.fasta file to run mmseqs2 on it!
+1. Run download_data.sh to download the data: 
+```
+sbatch download_data.sh
+```
+or 
+```
+./download_data.sh
+```
+2. run data_preprocessing.sh:
+```
+sbatch data_preprocessing.sh
+```
+or 
+```
+./data_preprocessing.sh
+```
+3. Run run_mmseqs2.sh to concat fasta files (pretrain.fasta, train.fasta, test.fasta, price.fasta, and ensemble.fasta (if existed)). Be sure no other .fasta files are existed in the data directory.
+We need "all.fasta" file to run mmseqs2 on it!
+```
+sbatch run_mmseqs2.sh
+```
+or 
+```
+./run_mmseqs2.sh
+```
 4. Run create_data.sh to create the final data for pretraining, training, and testing
 
 ## Models
