@@ -1,3 +1,4 @@
+import json
 import numpy as np
 import pandas as pd
 import sys,os
@@ -8,6 +9,7 @@ from ECRECer.tools import funclib
 from ECRECer.tools import minitools as mtool
 from pandarallel import pandarallel
 pandarallel.initialize(progress_bar=True)
+from Bio import SeqIO
 
 # We use ECRECer to preprocess the data: https://github.com/kingstdio/ECRECer
 def create_tsv_from_data(data_path):
@@ -84,13 +86,6 @@ def preprocessing(data_path, pretrain_path, train_path, test_path, price_path, e
     if ensemble_path:
         ensemble = ensemble[ensemble.ec_number != '-']
 
-    # remove sequences with length less than 50
-    pretrain = pretrain[pretrain.seq.str.len() >= 50]
-    train = train[train.seq.str.len() >= 50]
-    test = test[test.seq.str.len() >= 50]
-    if ensemble_path:
-        ensemble = ensemble[ensemble.seq.str.len() >= 50]
-
     test =test[~test.seq.isin(train.seq)]
     test =test[~test.seq.isin(pretrain.seq)]
     test.reset_index(drop=True, inplace=True) 
@@ -162,6 +157,29 @@ def preprocessing(data_path, pretrain_path, train_path, test_path, price_path, e
     print('Number of sequences in price data:', price.shape[0])
     print('Data preprocessing finished')
 
+# Check if we have 3d information for all train and test data
+def check_3d_information(data_path, train_path, test_path, info_file_path):
+    # get the protein ids from fasta files using biopython
+    train_ids = [record.id for record in SeqIO.parse(train_path, 'fasta')]
+    test_ids = [record.id for record in SeqIO.parse(test_path, 'fasta')]
+
+    # get the ids from json info_file
+    with open(info_file_path, 'r') as f:
+        info = json.load(f)
+        info_ids = list(info.keys())
+    
+    # check if all ids are in the info file
+    train_ids = list(set(train_ids).intersection(set(info_ids)))
+    test_ids = list(set(test_ids).intersection(set(info_ids)))
+                     
+    print(f'Number of train ids in info file: {len(train_ids)}')
+    print(f'Number of test ids in info file: {len(test_ids)}')
+
+    # exclude ids not in info file from train and test fasta data and save them to new files 
+    SeqIO.write((record for record in SeqIO.parse(train_path, 'fasta') if record.id in train_ids), os.path.join(data_path, 'train_having_3d.fasta'), 'fasta')
+    SeqIO.write((record for record in SeqIO.parse(test_path, 'fasta') if record.id in test_ids), os.path.join(data_path, 'test_having_3d.fasta'), 'fasta')
+
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Data merging script')
@@ -176,3 +194,4 @@ if __name__ == '__main__':
     # run following functions in order; comment out the functions that have been run
     create_tsv_from_data(data_path=args.data_path)
     preprocessing(data_path=args.data_path, pretrain_path=os.path.join(args.data_path, args.pretrain_name), train_path=os.path.join(args.data_path, args.train_name), test_path=os.path.join(args.data_path, args.test_name), price_path=os.path.join(args.data_path, args.price_name), ensemble_path=os.path.join(args.data_path, args.ensemble_name))
+    check_3d_information(data_path=args.data_path, train_path=os.path.join(args.data_path, 'train.fasta'), test_path=os.path.join(args.data_path, 'test.fasta'), info_file_path=os.path.join(args.data_path, 'swissprot_coordinates.json'))
