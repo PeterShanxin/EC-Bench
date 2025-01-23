@@ -24,24 +24,23 @@ or
 ```
 ./download_data.sh
 ```
-2. run data_preprocessing.sh:
+2. Run extract_coordinates.sh to extract the coordinates from the downloaded data:
+```
+sbatch extract_coordinates.sh
+```
+3. Run data_preprocessing.sh:
 ```
 sbatch data_preprocessing.sh
 ```
-or 
-```
-./data_preprocessing.sh
-```
-3. Run run_mmseqs2.sh to concat fasta files (pretrain.fasta, train.fasta, test.fasta, price.fasta, and ensemble.fasta (if existed)). Be sure no other .fasta files are existed in the data directory.
+4. Run run_mmseqs2.sh to concat fasta files (pretrain.fasta, train.fasta, test.fasta, price.fasta, and ensemble.fasta (if existed)). Be sure no other .fasta files are existed in the data directory.
 We need "all.fasta" file to run mmseqs2 on it!
 ```
 sbatch run_mmseqs2.sh
 ```
-or 
+5. Run create_data.sh to create the final data for training, testing, and ensemble:
 ```
-./run_mmseqs2.sh
+sbatch create_data.sh
 ```
-4. Run create_data.sh to create the final data for pretraining, training, and testing
 
 ## Models
 
