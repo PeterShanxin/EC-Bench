@@ -1,2 +1,2 @@
 #!/bin/bash
-python3 code/create_data.py &> create_data.log
+python3 code/create_data.py --ensemble_file_name ensemble.csv &> create_data.log
