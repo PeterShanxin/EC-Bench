@@ -102,10 +102,12 @@ def preprocessing(data_path, pretrain_path, train_path, test_path, price_path, e
     pretrain.reset_index(drop=True, inplace=True)
 
     if ensemble_path:
+        ensemble = ensemble[~ensemble.seq.isin(train.seq)]
         ensemble = ensemble[~ensemble.seq.isin(test.seq)]
         ensemble = ensemble[~ensemble.seq.isin(price.seq)]
         ensemble.reset_index(drop=True, inplace=True)
-
+        
+        ensemble = ensemble[~ensemble.id.isin(train.id.values)]
         ensemble = ensemble[~ensemble.id.isin(test.id.values)]
         ensemble = ensemble[~ensemble.id.isin(price.id.values)]
         ensemble.reset_index(drop=True, inplace=True)
