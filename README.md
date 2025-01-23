@@ -28,7 +28,7 @@ or
 ```
 sbatch extract_coordinates.sh
 ```
-3. Run data_preprocessing.sh:
+3. Run data_preprocessing.sh; Removes duplicates and invalid sequences and non-enzyme sequences from the data
 ```
 sbatch data_preprocessing.sh
 ```
@@ -37,10 +37,11 @@ We need "all.fasta" file to run mmseqs2 on it!
 ```
 sbatch run_mmseqs2.sh
 ```
-5. Run create_data.sh to create the final data for training, testing, and ensemble:
+5. Run create_data.sh to create the final data for training, testing, and ensemble; Output files are: train_ec.csv, test_ec.csv, ensemble_ec.csv for each similarity threshold.
 ```
 sbatch create_data.sh
 ```
+
 
 ## Models
 
