@@ -24,7 +24,7 @@ import os
 import json
 import argparse
 
-def extract_coordinates(pdb_dir, json_file):
+def extract_coordinates(data_dir, pdb_dir, json_file):
     """
     Extracts coordinates of specified atoms from PDB files and saves them in a JSON file.
 
@@ -55,15 +55,16 @@ def extract_coordinates(pdb_dir, json_file):
                                     z = float(line[46:54].strip())
                                     coordinates[atom_name].append([x, y, z])
                         final_dict[protein_id] = coordinates
-    with open(json_file, 'w') as f:
+    with open(os.path.join(data_dir, json_file), 'w') as f:
         json.dump(final_dict, f)
     print(f"Generated {json_file} with {len(final_dict)} entries")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='PDB Coordinate Extraction')
-    parser.add_argument('pdb_dir', type=str, help='Path to the PDB folder')
+    parser.add_argument('data_dir', type=str, help='Path to the data folder')
+    parser.add_argument('pdb_name', type=str, help='Name of the PDB folder')
     parser.add_argument('--json_file', type=str, default='swissprot_coordinates.json', help='Name of the output JSON file')
     args = parser.parse_args()
 
-    extract_coordinates(args.pdb_dir, args.json_file)
+    extract_coordinates(args.data_dir, os.path.join(args.data_dir, args.pdb_name), args.json_file)
 
