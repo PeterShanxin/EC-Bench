@@ -41,6 +41,10 @@ sbatch run_mmseqs2.sh
 ```
 sbatch create_data.sh
 ```
+6. Run go_creator.sh to create the GO terms for pretraining data; Output files are: pretrain_go_final.csv
+```
+sbatch go_creator.sh
+```
 
 
 ## Models
