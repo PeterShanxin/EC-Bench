@@ -3,6 +3,7 @@ import urllib.request
 import os
 import tarfile
 import shutil
+import gzip
 
 # Parse command-line arguments
 parser = argparse.ArgumentParser(description='Download and extract UniProt files')
@@ -72,5 +73,14 @@ tar_file = output_dir + f"/swissprot_pdb_v4.tar"
 with tarfile.open(tar_file, "r:") as tar: 
     tar.extract("swissprot_pdb_v4") 
 shutil.move("swissprot_pdb_v4/", output_dir + "/swissprot_pdb_v4")
+
+# download GO terms from: https://ftp.ebi.ac.uk/pub/databases/GO/goa/UNIPROT/goa_uniprot_all.gaf.gz and extract it
+url = 'https://ftp.ebi.ac.uk/pub/databases/GO/goa/UNIPROT/goa_uniprot_all.gaf.gz'
+
+urllib.request.urlretrieve(url, output_dir + '/goa_uniprot_all.gaf.gz')
+with gzip.open(output_dir + '/goa_uniprot_all.gaf.gz', 'rb') as f_in:
+    with open(output_dir + '/goa_uniprot_all.gaf', 'wb') as f_out:
+        f_out.write(f_in.read())
+
 
 
