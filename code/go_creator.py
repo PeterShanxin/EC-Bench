@@ -1,18 +1,13 @@
 import pandas as pd
 import ahocorasick
 import pickle
-import urllib
-import gzip
+import os
+import sys
+sys.path.append(os.getcwd())
+import argparse
 
-# download go from: https://ftp.ebi.ac.uk/pub/databases/GO/goa/UNIPROT/goa_uniprot_all.gaf.gz and extract it
-url = 'https://ftp.ebi.ac.uk/pub/databases/GO/goa/UNIPROT/goa_uniprot_all.gaf.gz'
-# download the file from the url and save it as 'goa_uniprot_all.gaf'
-urllib.request.urlretrieve(url, 'data/goa_uniprot_all.gaf.gz')
-with gzip.open('data/goa_uniprot_all.gaf.gz', 'rb') as f_in:
-    with open('data/goa_uniprot_all.gaf', 'wb') as f_out:
-        f_out.write(f_in.read())
 
-def filter_columns(input_file = 'data/goa_uniprot_all.gaf', output_file = 'data/filtered_goa.csv'):
+def filter_columns(data_path, input_file = 'goa_uniprot_all.gaf', output_file = 'filtered_goa.csv'):
 
     column_names = [
         'DB', 'DB_Object_ID', 'DB_Object_Symbol', 'Qualifier', 'GO_ID', 
@@ -23,13 +18,13 @@ def filter_columns(input_file = 'data/goa_uniprot_all.gaf', output_file = 'data/
     ]
 
     # Initialize output file
-    with open(output_file, 'w') as f:
+    with open(os.path.join(data_path, output_file), 'w') as f:
         pass
 
     # Step 1: Read the DataFrame in chunks
     chunksize = 1000000  # Adjust the chunk size as needed
     chunk_c=1
-    for chunk in pd.read_csv(input_file, sep='\t', names=column_names, comment='!', dtype=str, chunksize=chunksize):
+    for chunk in pd.read_csv(os.path.join(data_path, input_file), sep='\t', names=column_names, comment='!', dtype=str, chunksize=chunksize):
         
         # Step 2: Keep only the 'DB_Object_ID' and 'GO_ID' columns
         df_filtered = chunk[['DB_Object_ID', 'GO_ID']]
@@ -38,20 +33,20 @@ def filter_columns(input_file = 'data/goa_uniprot_all.gaf', output_file = 'data/
         df_filtered.columns = ['id', 'go_terms']
         
         # Step 4: Append the filtered and renamed DataFrame chunk to the output file
-        df_filtered.to_csv(output_file, mode='a', index=False, header=False)
+        df_filtered.to_csv(os.path.join(data_path, output_file), mode='a', index=False, header=False)
         print(chunk_c)
         chunk_c += 1
 
     print(f"The filtered DataFrame has been saved to {output_file}")
     
     
-def filter_ids(filter_ids_file = 'data/pretrain_ec_ids.tsv', input_file = 'data/filtered_goa.csv', output_file = 'data/pretrain_go.csv'):
+def filter_ids(data_path, filter_ids_file = 'pretrain_ids.tsv', input_file = 'filtered_goa.csv', output_file = 'pretrain_go.csv'):
 
-    filter_ids_df = pd.read_csv(filter_ids_file, sep='\t', header=None, names=['id'])
+    filter_ids_df = pd.read_csv(os.path.join(data_path, filter_ids_file), sep='\t', header=None, names=['id'])
     filter_ids = filter_ids_df['id'].tolist()
     print(len(filter_ids))
 
-    with open(output_file, 'w') as f:
+    with open(os.path.join(data_path, output_file), 'w') as f:
         pass
 
     # Build the Aho-Corasick automaton
@@ -62,23 +57,23 @@ def filter_ids(filter_ids_file = 'data/pretrain_ec_ids.tsv', input_file = 'data/
        
     # Step 1: Read the DataFrame in chunks
     chunksize = 1000000  # Adjust the chunk size as needed
-    for chunk in pd.read_csv(input_file, sep=',', header=None, names=['id', 'go_terms'], chunksize=chunksize):
+    for chunk in pd.read_csv(os.path.join(data_path, input_file), sep=',', header=None, names=['id', 'go_terms'], chunksize=chunksize):
         def filter_terms(row):
             return A.exists(row['id'])
 
         df_filtered = chunk[chunk.apply(filter_terms, axis=1)]
                
         # Step 5: Append the filtered and renamed DataFrame chunk to the output file
-        df_filtered.to_csv(output_file, mode='a', index=False)
+        df_filtered.to_csv(os.path.join(data_path, output_file), mode='a', index=False)
                 
     print(f"The filtered DataFrame has been saved to {output_file}")
 
 
-def filter_frequent_pretrain(input_file = 'data/pretrain_go.csv', output_file = 'data/pretrain_go_frequent.csv', go_terms_dict_file = 'data/frequent_go_terms.pkl'):
+def filter_frequent_pretrain(data_path, input_file = 'pretrain_go.csv', output_file = 'pretrain_go_frequent.csv', go_terms_dict_file = 'frequent_go_terms.pkl'):
     # Step 1: Read the DataFrame from the input file
-    df = pd.read_csv(input_file, sep=',')
+    df = pd.read_csv(os.path.join(data_path, input_file), sep=',')
     df.drop_duplicates(subset=['id', 'go_terms'], inplace=True)
-    df.to_csv(input_file, index=False)
+    df.to_csv(os.path.join(data_path, input_file), index=False)
     
     # Step 2: Calculate the frequency of each GO term
     go_term_counts = df['go_terms'].value_counts()
@@ -100,22 +95,22 @@ def filter_frequent_pretrain(input_file = 'data/pretrain_go.csv', output_file = 
     df_filtered = df[df.apply(filter_frequent_terms, axis=1)]
 
     # Step 4: Save the filtered DataFrame to a new file
-    df_filtered.to_csv(output_file, index=False)
+    df_filtered.to_csv(os.path.join(data_path, output_file), index=False)
 
     # Step 5: Create a dictionary with the frequent GO terms and their assigned indices
     frequent_go_terms_dict = {term: idx for idx, term in enumerate(frequent_go_terms)}
 
     # Step 6: Save the dictionary to a file using pickle
-    with open(go_terms_dict_file, 'wb') as f:
+    with open(os.path.join(data_path, go_terms_dict_file), 'wb') as f:
         pickle.dump(frequent_go_terms_dict, f)
 
     # Step 7: Print the total number of frequent terms
     print(f"Total number of frequent terms: {len(frequent_go_terms)}")
 
-def filter_most_frequent(input_file = 'data/pretrain_go_frequent.csv', output_file = 'data/pretrain_go_frequent_8943.csv', go_terms_dict_file = 'data/8943_frequent_go_terms.pkl'):
+def filter_most_frequent(data_path, input_file = 'pretrain_go_frequent.csv', output_file = 'pretrain_go_frequent_8943.csv', go_terms_dict_file = '8943_frequent_go_terms.pkl'):
     
     # Step 1: Read the DataFrame from the input file
-    df = pd.read_csv(input_file)
+    df = pd.read_csv(os.path.join(data_path, input_file))
     print("pretrain_go_frequent length:", len(df))
     # Step 2: Calculate the frequency of each GO term
     go_term_counts = df['go_terms'].value_counts()
@@ -141,24 +136,23 @@ def filter_most_frequent(input_file = 'data/pretrain_go_frequent.csv', output_fi
     print("len df_grouped:", len(df_grouped))
 
     # Step 6: Save the filtered DataFrame to a new file
-    df_grouped.to_csv(output_file, index=False)
+    df_grouped.to_csv(os.path.join(data_path, output_file), index=False)
 
     # Step 7: Create a dictionary with the top GO terms and their assigned indices
     top_go_terms_dict = {term: idx for idx, term in enumerate(top_go_terms)}
 
     # Step 8: Save the dictionary to a file using pickle
-    with open(go_terms_dict_file, 'wb') as f:
+    with open(os.path.join(data_path, go_terms_dict_file), 'wb') as f:
         pickle.dump(top_go_terms_dict, f)
 
     # Step 9: Print the total number of top terms
     print(f"Total number of top terms: {len(top_go_terms)}")
 
-
-def merge(file1 = 'data/cluster-100-new/pretrain_ec.csv', file2 = 'data/pretrain_go_frequent_8943.csv'):
-    
+def merge(data_path, file1 = 'pretrain.csv', file2 = 'pretrain_go_frequent_8943.csv'):
+    # This step is to add
     # Step 1: Read the two CSV files into DataFrames
-    df1 = pd.read_csv(file1, usecols=['id', 'seq'])
-    df2 = pd.read_csv(file2)
+    df1 = pd.read_csv(os.path.join(data_path, file1), usecols=['id', 'seq']) # pretrain.csv has EC numbers column which is not needed.
+    df2 = pd.read_csv(os.path.join(data_path, file2))
 
     # Step 2: Merge the DataFrames on 'id' with a left join
     merged_df = pd.merge(df1, df2, on='id', how='left')
@@ -167,7 +161,7 @@ def merge(file1 = 'data/cluster-100-new/pretrain_ec.csv', file2 = 'data/pretrain
     merged_df['go_terms'].fillna("-", inplace=True)
 
     # Optional: Save the merged DataFrame to a new CSV file
-    output_file = 'data/pretrain_go_final.csv'
+    output_file = data_path + '/pretrain_go_final.csv'
     merged_df.to_csv(output_file, index=False)
 
     # Display the merged DataFrame
@@ -181,5 +175,18 @@ def merge(file1 = 'data/cluster-100-new/pretrain_ec.csv', file2 = 'data/pretrain
     if all_ids_in_df2:
         print("All IDs in df2 are present in df1.")
 
-merge()
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description='GO Creator')
+    parser.add_argument('--data_path', type=str, default='data', help='Path to the data directory')
+    args = parser.parse_args()
+    # call the functions
+    filter_columns(args.data_path)
+    filter_ids(args.data_path)
+    filter_frequent_pretrain(args.data_path)
+    filter_most_frequent(args.data_path)
+    merge(args.data_path)
+
+
+
+
 
