@@ -111,9 +111,10 @@ def create_data(data_path, train_ec_path, test_ec_path, train_3d_path, test_3d_p
         del clusters
     
     # save the ids_to_remove in a tsv file
-    ids_to_remove_path = os.path.join(data_path, f'ids_to_remove-{t}.tsv')
-    ids_to_remove_df = pd.DataFrame(ids_to_remove, columns=['id'])
-    ids_to_remove_df.to_csv(ids_to_remove_path, index=False, header=False)
+    ids_to_remove_path = os.path.join(data_path, 'cluster-{t}/ids_to_remove.txt')
+    with open(ids_to_remove_path, 'w') as f:
+        for id in ids_to_remove:
+            f.write(f'{id}\n')
 
     path = os.path.join(data_path, f'cluster-{t}')
 
@@ -137,7 +138,7 @@ def create_data(data_path, train_ec_path, test_ec_path, train_3d_path, test_3d_p
         # remove the sequences that are similar to the test sequences
         ensemble = ensemble[~ensemble['id'].isin(ids_to_remove)]
         ensemble.reset_index(drop=True, inplace=True)
-        ensemble_path = os.path.join(path, f'ensemble_ec.csv')
+        ensemble_path = path + '/ensemble_ec.csv'
         ensemble.to_csv(ensemble_path, index=False)
         print('ensemble size: ', ensemble.shape)
 
