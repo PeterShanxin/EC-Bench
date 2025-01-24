@@ -80,7 +80,6 @@ def preprocessing(data_path, pretrain_path, train_path, test_path, price_path, e
     del test_data
 
     # remove sequences with no EC number
-    pretrain = pretrain[pretrain.ec_number != '-']
     train = train[train.ec_number != '-']
     test = test[test.ec_number != '-']
     if ensemble_path:
@@ -144,6 +143,9 @@ def preprocessing(data_path, pretrain_path, train_path, test_path, price_path, e
 
     # save the data to csv files
     pretrain.to_csv(os.path.join(data_path, 'pretrain.csv'), index=False)
+    # save pretrain ids to a tsv file for GO term creation
+    pretrain[['id']].to_csv(os.path.join(data_path, 'pretrain_ids.tsv'), index=False, header=False)
+    
     train.to_csv(os.path.join(data_path, 'train.csv'), index=False)
     test.to_csv(os.path.join(data_path, 'test.csv'), index=False)
     if ensemble_path:
