@@ -167,15 +167,23 @@ Feel free to open an issue for discussion before submitting major changes.
 
 ## Citation
 
-If you use this code in your research, please cite our paper:
+If you use EC-Bench in your research, please cite the following:
 
 ```bibtex
 @article{EC-Bench,
   title={EC-Bench: A Benchmark for Enzyme Commission Number Prediction},
-  author={Saeedeh Davoudi, Christopher S. Henry, Christopher S. Miller, Farnoush Banaei-Kashani},
-  journal={Journal Name},
+  author={Saeedeh Davoudi et al.},
+  journal={Bioinformatics},
   year={2025}
 }
+```
+
+## Contact
+For questions or feedback, please contact:
+
+```
+Saeedeh Davoudi
+saeedeh.davoudi@ucdenver.edu
 ```
 
 ## License
