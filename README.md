@@ -82,6 +82,26 @@ Suggest novel or alternate EC numbers. Evaluated via:
 
 ---
 
+## Data Preparation
+
+The EC-Bench framework includes a standardized pipeline for preparing pretraining, training, and testing datasets to ensure fair evaluation across models. The figure below outlines the data preparation steps:
+
+![Data Preparation Pipeline](./figures/Figure1.svg)
+
+### Summary of Dataset Splits:
+
+| Dataset Type      | Source         | Similarity Threshold | Description                                |
+|-------------------|----------------|-----------------------|--------------------------------------------|
+| Pretraining       | TrEMBL 2018-02 | N/A                   | For large-scale unsupervised training      |
+| Training (100%)   | Swiss-Prot 2018-02 | 100%              | For models tested on high-similarity data  |
+| Training (30%)    | Swiss-Prot 2018-02 | 30%               | For models tested on generalization        |
+| Test              | Swiss-Prot 2023-01 | 30%, 100%         | Realistic and updated EC annotations       |
+| Price-149         | CLEAN paper     | N/A                   | Manually curated difficult test cases      |
+
+
+---
+
+
 ## Models
 
 |       Model Name        | Link                                                        | Year |
