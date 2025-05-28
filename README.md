@@ -3,7 +3,10 @@
 **EC-Bench** is a benchmark framework for evaluating enzyme annotation models that predict Enzyme Commission (EC) numbers from protein sequences. EC numbers describe the biochemical reactions enzymes catalyze, and predicting them accurately is essential for understanding protein function.
 
 While many EC prediction methods already exist — including homology-based tools, deep learning models, contrastive learning techniques, and protein language models — there's been no consistent way to evaluate and compare their performance. **EC-Bench** fills this gap by offering a unified, open-source platform.
+
+
 ![EC-Bench Workflow](./figures/Figure2.svg)
+
 
 ## What EC-Bench provides?
 - ✅ A curated dataset and preprocessing pipeline.
