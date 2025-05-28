@@ -82,6 +82,24 @@ Suggest novel or alternate EC numbers. Evaluated via:
 
 ---
 
+## Models
+
+|       Model Name        | Link                                                        | Year |
+|-------------------|------------------------------------------------------------|------|
+|       ProteinBERT       | [LINK](https://github.com/nadavbra/protein_bert)         |  2022    |
+|       DeepEC            | [LINK](https://bitbucket.org/kaistsystemsbiology/deepec/src/master/) |   2018   |
+|       ECPred            | [LINK](https://github.com/cansyl/ECPred)                 |  2018    |
+|       DeepECtransformer | [LINK](https://github.com/kaistsystemsbiology/DeepProZyme) |   2023   |
+|       EnzBERT           | [LINK](https://gitlab.inria.fr/nbuton/tfpc)              |   2023   |
+|       ECRECer           | [LINK](https://github.com/kingstdio/ECRECer)             |  2022    |
+|       CLEAN             | [LINK](https://github.com/tttianhao/CLEAN)               |  2023    |
+|       BLASTp            | [LINK](https://github.com/bbuchfink/diamond/wiki)        |  2008    |
+|       CatFam            | [LINK](http://www.bhsai.org/downloads/catfam.tar.gz)     |  2008    |
+|       PRIAM           | [LINK](http://priam.prabi.fr/REL_JAN18/Distribution.zip)   |  2013    |
+
+
+---
+
 ## Table of Contents
 
 - [Installation](#installation)
@@ -130,21 +148,6 @@ sbatch create_data.sh
 ```
 sbatch go_creator.sh
 ```
-
-## Models
-
-|       Model Name        | Link                                                        | Year |
-|-------------------|------------------------------------------------------------|------|
-|       ProteinBERT       | [LINK](https://github.com/nadavbra/protein_bert)         |  2022    |
-|       DeepEC            | [LINK](https://bitbucket.org/kaistsystemsbiology/deepec/src/master/) |   2018   |
-|       ECPred            | [LINK](https://github.com/cansyl/ECPred)                 |  2018    |
-|       DeepECtransformer | [LINK](https://github.com/kaistsystemsbiology/DeepProZyme) |   2023   |
-|       EnzBERT           | [LINK](https://gitlab.inria.fr/nbuton/tfpc)              |   2023   |
-|       ECRECer           | [LINK](https://github.com/kingstdio/ECRECer)             |  2022    |
-|       CLEAN             | [LINK](https://github.com/tttianhao/CLEAN)               |  2023    |
-|       BLASTp            | [LINK](https://github.com/bbuchfink/diamond/wiki)        |  2008    |
-|       CatFam            | [LINK](http://www.bhsai.org/downloads/catfam.tar.gz)     |  2008    |
-|       PRIAM           | [LINK](http://priam.prabi.fr/REL_JAN18/Distribution.zip)   |  2013    |
 
 
 ## Contributing
