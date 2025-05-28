@@ -7,24 +7,80 @@ While many EC prediction methods already exist — including homology-based tool
 
 ![EC-Bench Workflow](./figures/Figure2.svg)
 
+---
 
-## What EC-Bench provides?
-- ✅ A curated dataset and preprocessing pipeline.
-- 🔬 A selection of 10 diverse EC prediction models.
-- 📊 Standardized evaluation metrics for:
-  - Accuracy: F1 score, precision, recall.
-  - Efficiency: memory usage, runtime, storage usage.
-- 🧪 Support for multiple prediction tasks:
-  - **Exact EC Number Prediction**: Predict complete EC numbers at all hierarchy levels.
-  - **EC Number Completion**: Fill in missing parts of partial EC numbers.
-  - **EC Number Recommendation**: Suggest possible EC numbers for new or partially known enzymes.
+## 🧬 What are EC Numbers?
 
-## Why use EC-Bench?
-- 🔁 Fair and reproducible model comparison.
-- 📈 Insight into strengths and limitations of different methods.
-- 🧬 Evaluation across both curated and challenging datasets (e.g., Price-149).
+Enzyme Commission (EC) numbers are four-level hierarchical annotations that classify enzymes based on the chemical reactions they catalyze. Accurate EC prediction is essential for understanding enzyme functions, annotating protein sequences, and advancing functional genomics.
 
-Whether you're building a new EC prediction model or exploring the performance of existing ones, **EC-Bench** offers a robust and flexible environment to support your research in enzyme function prediction.
+---
+
+
+## 🚀 Features
+
+- **Standardized Datasets:** Pretraining, training, and testing datasets prepared from UniProtKB (Swiss-Prot and TrEMBL) and Price-149.
+- **Model Coverage:** 10 representative models, spanning homology-based (e.g., BLASTp), deep learning, contrastive learning (e.g., CLEAN), and protein language models (e.g., EnzBert, ProteinBERT).
+- **Multiple Evaluation Tasks:**
+  - *Exact EC Number Prediction*
+  - *EC Number Completion*
+  - *Partial/Additional EC Number Recommendation*
+- **Evaluation Metrics:**
+  - Performance: Weighted F1, Precision, Recall
+  - Resource Usage: Memory, Runtime, Storage
+  - Consistency: Agreement Rate, Reaction Similarity
+- **Interoperable Framework:** Easily add and evaluate new models.
+
+---
+
+
+## 🧪 Benchmark Tasks
+
+### 1. Exact EC Number Prediction
+Predict the full EC number at all levels (1-4). Performance is measured using:
+
+- *Precision* = TP / (TP + FP)
+- *Recall* = TP / (TP + FN)
+- *F1 Score (Weighted)* = Takes class imbalance into account
+
+### 2. EC Number Completion
+Fill in missing parts of partial EC numbers. Since ground truth may be unavailable, we measure:
+
+- **Coverage**: Fraction of proteins for which a complete EC number was generated.
+- **Agreement Rate**: Percentage of completions where a majority of models agree.
+
+### 3. Partial/Complete EC Number Recommendation
+Suggest novel or alternate EC numbers. Evaluated via:
+
+- **Reaction Similarity Score**: Computed using RDKit and reactions from ECReact.
+- **Weighted/Average Similarity Score**: Combines similarity with prediction coverage.
+
+---
+
+## 📊 Evaluation Metrics
+
+| Metric              | Description |
+|---------------------|-------------|
+| **Precision**       | Accuracy of positive predictions |
+| **Recall**          | Coverage of relevant EC classes |
+| **F1 Score**        | Harmonic mean of precision and recall |
+| **Agreement Rate**  | Model consensus on EC completions |
+| **Reaction Similarity** | Biochemical similarity of predicted vs. true EC reactions |
+| **Memory Usage (GiB)** | GPU/CPU memory during training |
+| **Model Size (MiB)** | Disk storage footprint |
+| **Runtime (s)**     | Time for inference and training |
+
+---
+
+## 📂 Datasets
+
+| Dataset Type | Source | Version |
+|--------------|--------|---------|
+| Pretraining  | TrEMBL | 2018-02 |
+| Training     | Swiss-Prot | 2018-02 |
+| Test         | Swiss-Prot | 2023-01 |
+| Challenging Test | Price-149 | Manual |
+
+---
 
 ## Table of Contents
 
