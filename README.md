@@ -9,14 +9,14 @@ While many EC prediction methods already exist — including homology-based tool
 
 ---
 
-## 🧬 What are EC Numbers?
+## What are EC Numbers?
 
 Enzyme Commission (EC) numbers are four-level hierarchical annotations that classify enzymes based on the chemical reactions they catalyze. Accurate EC prediction is essential for understanding enzyme functions, annotating protein sequences, and advancing functional genomics.
 
 ---
 
 
-## 🚀 Features
+## Features
 
 - **Standardized Datasets:** Pretraining, training, and testing datasets prepared from UniProtKB (Swiss-Prot and TrEMBL) and Price-149.
 - **Model Coverage:** 10 representative models, spanning homology-based (e.g., BLASTp), deep learning, contrastive learning (e.g., CLEAN), and protein language models (e.g., EnzBert, ProteinBERT).
@@ -33,7 +33,7 @@ Enzyme Commission (EC) numbers are four-level hierarchical annotations that clas
 ---
 
 
-## 🧪 Benchmark Tasks
+## Benchmark Tasks
 
 ### 1. Exact EC Number Prediction
 Predict the full EC number at all levels (1-4). Performance is measured using:
@@ -56,7 +56,7 @@ Suggest novel or alternate EC numbers. Evaluated via:
 
 ---
 
-## 📊 Evaluation Metrics
+## Evaluation Metrics
 
 | Metric              | Description |
 |---------------------|-------------|
@@ -71,7 +71,7 @@ Suggest novel or alternate EC numbers. Evaluated via:
 
 ---
 
-## 📂 Datasets
+## Datasets
 
 | Dataset Type | Source | Version |
 |--------------|--------|---------|
