@@ -1,10 +1,11 @@
-# EC-Bench
+# EC-Bench: A Benchmark for Enzyme Commission Number Prediction
 
 **EC-Bench** is a benchmark framework for evaluating enzyme annotation models that predict Enzyme Commission (EC) numbers from protein sequences. EC numbers describe the biochemical reactions enzymes catalyze, and predicting them accurately is essential for understanding protein function.
 
 While many EC prediction methods already exist — including homology-based tools, deep learning models, contrastive learning techniques, and protein language models — there's been no consistent way to evaluate and compare their performance. **EC-Bench** fills this gap by offering a unified, open-source platform.
+![EC-Bench Workflow](./figures/Figure2.svg)
 
-## What EC-Bench provides
+## What EC-Bench provides?
 - ✅ A curated dataset and preprocessing pipeline.
 - 🔬 A selection of 10 diverse EC prediction models.
 - 📊 Standardized evaluation metrics for:
@@ -25,19 +26,21 @@ Whether you're building a new EC prediction model or exploring the performance o
 ## Table of Contents
 
 - [Installation](#installation)
+- [Data Preparation](#data-preparation)
 - [Models](#models)
 - [Usage](#usage)
 - [Contributing](#contributing)
+- [Citation](#citation)
 - [License](#license)
 
 ## Installation
 1. Install [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/)
-
-## Usage
-1. Clone the repository  
+2. Clone the repository  
 ```
 git clone https://github.com/dsaeedeh/EC-Bench.git
 ```
+3. Install each model by following the instructions in their respective README files.
+
 ### Data Preparation
 1. Run download_data.sh to download the data: 
 ```
@@ -69,7 +72,6 @@ sbatch create_data.sh
 sbatch go_creator.sh
 ```
 
-
 ## Models
 
 |       Model Name        | Link                                                        | Year |
@@ -87,8 +89,36 @@ sbatch go_creator.sh
 
 
 ## Contributing
+We welcome contributions from the community! You can:
+
+- 🧩 Add new models to the benchmark.
+- 📊 Suggest or implement new evaluation metrics.
+- 🛠 Improve preprocessing pipelines or dataset support.
+- 📝 Report issues or suggest enhancements.
+
+To contribute:
+1. Fork the repository.
+2. Open a pull request with your proposed changes.
+3. If you are adding a model, include clear instructions and dependencies.
+
+Feel free to open an issue for discussion before submitting major changes.
+
+## Citation
+
+If you use this code in your research, please cite our paper:
+
+```bibtex
+@article{EC-Bench,
+  title={EC-Bench: A Benchmark for Enzyme Commission Number Prediction},
+  author={Saeedeh Davoudi, Christopher S. Henry, Christopher S. Miller, Farnoush Banaei-Kashani},
+  journal={Journal Name},
+  year={2025}
+}
+```
 
 ## License
+EC-Bench is distributed under the [MIT License](https://github.com/dsaeedeh/EC-Bench/blob/main/LICENSE).
+
 
 
 
