@@ -5,7 +5,7 @@
 While many EC prediction methods already exist — including homology-based tools, deep learning models, contrastive learning techniques, and protein language models — there's been no consistent way to evaluate and compare their performance. **EC-Bench** fills this gap by offering a unified, open-source platform.
 
 
-<img src="figures/Figure2.svg" width="600" length="1600"/>
+<img src="figures/Figure2.svg" width="1600" length="1600"/>
 
 
 ---
