@@ -109,7 +109,7 @@ The EC-Bench framework includes a standardized pipeline for preparing pretrainin
 |-------------------|----------------------------------------------------------------------|------|
 | BLASTp            | [LINK](https://github.com/bbuchfink/diamond/wiki)                   | 2008 |
 | CatFam            | [LINK](http://www.bhsai.org/downloads/catfam.tar.gz)                | 2008 |
-| PRIAM             | [LINK](http://priam.prabi.fr/REL_JAN18/Distribution.zip)            | 2013 |
+| PRIAM             | [LINK](https://web.archive.org/web/20160806022844/http://priam.prabi.fr/REL_MAR13/Distribution.zip)            | 2013 |
 | DeepEC            | [LINK](https://bitbucket.org/kaistsystemsbiology/deepec/src/master/)| 2018 |
 | ECPred            | [LINK](https://github.com/cansyl/ECPred)                            | 2018 |
 | ProteinBERT       | [LINK](https://github.com/nadavbra/protein_bert)                    | 2022 |
