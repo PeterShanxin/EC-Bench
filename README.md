@@ -105,18 +105,18 @@ The EC-Bench framework includes a standardized pipeline for preparing pretrainin
 
 ## Models
 
-|       Model Name        | Link                                                        | Year |
-|-------------------|------------------------------------------------------------|------|
-|       ProteinBERT       | [LINK](https://github.com/nadavbra/protein_bert)         |  2022    |
-|       DeepEC            | [LINK](https://bitbucket.org/kaistsystemsbiology/deepec/src/master/) |   2018   |
-|       ECPred            | [LINK](https://github.com/cansyl/ECPred)                 |  2018    |
-|       DeepECtransformer | [LINK](https://github.com/kaistsystemsbiology/DeepProZyme) |   2023   |
-|       EnzBERT           | [LINK](https://gitlab.inria.fr/nbuton/tfpc)              |   2023   |
-|       ECRECer           | [LINK](https://github.com/kingstdio/ECRECer)             |  2022    |
-|       CLEAN             | [LINK](https://github.com/tttianhao/CLEAN)               |  2023    |
-|       BLASTp            | [LINK](https://github.com/bbuchfink/diamond/wiki)        |  2008    |
-|       CatFam            | [LINK](http://www.bhsai.org/downloads/catfam.tar.gz)     |  2008    |
-|       PRIAM           | [LINK](http://priam.prabi.fr/REL_JAN18/Distribution.zip)   |  2013    |
+| Model Name        | Link                                                                 | Year |
+|-------------------|----------------------------------------------------------------------|------|
+| BLASTp            | [LINK](https://github.com/bbuchfink/diamond/wiki)                   | 2008 |
+| CatFam            | [LINK](http://www.bhsai.org/downloads/catfam.tar.gz)                | 2008 |
+| PRIAM             | [LINK](http://priam.prabi.fr/REL_JAN18/Distribution.zip)            | 2013 |
+| DeepEC            | [LINK](https://bitbucket.org/kaistsystemsbiology/deepec/src/master/)| 2018 |
+| ECPred            | [LINK](https://github.com/cansyl/ECPred)                            | 2018 |
+| ProteinBERT       | [LINK](https://github.com/nadavbra/protein_bert)                    | 2022 |
+| ECRECer           | [LINK](https://github.com/kingstdio/ECRECer)                        | 2022 |
+| DeepECtransformer | [LINK](https://github.com/kaistsystemsbiology/DeepProZyme)          | 2023 |
+| EnzBERT           | [LINK](https://gitlab.inria.fr/nbuton/tfpc)                         | 2023 |
+| CLEAN             | [LINK](https://github.com/tttianhao/CLEAN)                          | 2023 |
 
 
 ---
@@ -125,8 +125,7 @@ The EC-Bench framework includes a standardized pipeline for preparing pretrainin
 
 - [Installation](#installation)
 - [Data Preparation](#data-preparation)
-- [Models](#models)
-- [Usage](#usage)
+- [Training the models](#training-the-models)
 - [Contributing](#contributing)
 - [Citation](#citation)
 - [License](#license)
@@ -171,6 +170,8 @@ sbatch go_creator.sh
 ```
 
 After running the above steps, you can find the final data in the data directory for each similarity threshold. training data is train_ec.csv, test data is test_ec.csv, and ensemble data is ensemble_ec.csv.
+
+### Training the models
 
 ## Contributing
 We welcome contributions from the community! You can:
