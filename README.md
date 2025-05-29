@@ -196,7 +196,7 @@ If you use EC-Bench in your research, please cite the following:
 @article{EC-Bench,
   title={EC-Bench: A Benchmark for Enzyme Commission Number Prediction},
   author={Saeedeh Davoudi et al.},
-  journal={Bioinformatics},
+  journal={},
   year={2025}
 }
 ```
