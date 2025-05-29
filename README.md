@@ -87,7 +87,7 @@ Suggest novel or alternate EC numbers. Evaluated via:
 
 The EC-Bench framework includes a standardized pipeline for preparing pretraining, training, and testing datasets to ensure fair evaluation across models. The figure below outlines the data preparation steps:
 
-![Data Preparation Pipeline](./figures/Figure1.png)
+<img src="figures/Figure1.png" width="1600" length="1600"/>
 
 ### Summary of Dataset Splits:
 
