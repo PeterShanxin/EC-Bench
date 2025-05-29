@@ -170,6 +170,7 @@ sbatch create_data.sh
 sbatch go_creator.sh
 ```
 
+After running the above steps, you can find the final data in the data directory for each similarity threshold. training data is train_ec.csv, test data is test_ec.csv, and ensemble data is ensemble_ec.csv.
 
 ## Contributing
 We welcome contributions from the community! You can:
