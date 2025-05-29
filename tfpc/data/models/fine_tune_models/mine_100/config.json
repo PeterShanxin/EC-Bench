@@ -18,7 +18,7 @@
             "batch_size": 2,
             "theorical_batch_size": 32,
             "limit_size_input_prot": 1024,
-            "data_path": "mine_30_task3",
+            "data_path": "mine_100",
             "dataset_type": {
                 "name": "Classification_per_prot_dataset",
                 "params": []
