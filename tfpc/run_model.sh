@@ -3,7 +3,20 @@
 virtualenv tfpc_env
 source tfpc_env/bin/activate
 
-python3.7 -m pip install -r requirements.txt
+python3.7 -m pip install -r tfpc/requirements.txt
+
+# Install DIAMOND if not installed
+if ! command -v diamond &> /dev/null; then
+    echo "DIAMOND not found. Installing DIAMOND..."
+    wget http://github.com/bbuchfink/diamond/releases/download/v2.1.8/diamond-linux64.tar.gz
+    tar xzf diamond-linux64.tar.gz
+    mv diamond /usr/local/bin/diamond
+    chmod +x /usr/local/bin/diamond
+    rm diamond-linux64.tar.gz
+    echo "DIAMOND installed."
+else
+    echo "DIAMOND is already installed."
+fi
 
 wget https://zenodo.org/records/7253910/files/data.zip
 # unzip data.zip into data folder
