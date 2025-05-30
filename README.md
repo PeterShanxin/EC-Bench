@@ -177,6 +177,7 @@ Each model has a run_model.sh script that contains the commands to run the model
 ```
 sbatch all_models.sh
 ```
+After running the models, you can find the results in the results directory. Each model will create a subdirectory with its name and the results will be saved in that directory for each similarity threshold.
 
 
 ## Contributing
