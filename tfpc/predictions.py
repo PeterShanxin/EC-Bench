@@ -36,6 +36,12 @@ parser.add_argument(
     type=Path,
 )
 parser.add_argument(
+    "--output_folder_path",
+    help="Output folder path where the results will be saved",
+    type=Path,
+    default="results/tfpc",
+)
+parser.add_argument(
     "--max_seq_lenght",
     help="Limit the sequence lenght and take only the begining of the sequence. This can avoid Out Of Memory error for very long sequences.",
     default=2048,
@@ -60,7 +66,7 @@ parser.add_argument(
 args = parser.parse_args()
 
 # Create dynamic output directory
-output_folder_path = Path(f"mine_{args.cluster}/{args.dataset}/")
+output_folder_path = Path(args.output_folder_path + "/" + "mine_" + args.cluster + "/" + args.dataset + "/")
 output_folder_path.mkdir(parents=True, exist_ok=True)
 
 if args.chosen_model == "EnzBert_EC40":
