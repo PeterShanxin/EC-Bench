@@ -21,23 +21,25 @@ def generate_all_predictions(path_train, path_test, path_output):
 
 
 # call the function
+cluster = 30
 generate_all_predictions(
     "data/datasets/mine_30/train_blastp.json",
     "data/datasets/price_blastp.json",
-    "data/predictions/price_BLASTp_30.csv",
+    "../results/blastp/cluster-" + str(cluster) + "/price_149_blastp.csv",
 )
 generate_all_predictions(
     "data/datasets/mine_30/train_blastp.json",
     "data/datasets/mine_30/test.json",
-    "data/predictions/test_BLASTp_30.csv",
+    "../results/blastp/cluster-" + str(cluster) + "/test_blastp.csv",
 )
+cluster = 100
 generate_all_predictions(
     "data/datasets/mine_100/train_blastp.json",
     "data/datasets/price_blastp.json",
-    "data/predictions/price_BLASTp_100.csv",
+    "../results/blastp/cluster-" + str(cluster) + "/price_149_blastp.csv",
 )
 generate_all_predictions(
     "data/datasets/mine_100/train_blastp.json",
     "data/datasets/mine_100/test.json",
-    "data/predictions/test_BLASTp_100.csv",
+    "../results/blastp/cluster-" + str(cluster) + "/test_blastp.csv",
 )

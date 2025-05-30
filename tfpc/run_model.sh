@@ -12,10 +12,9 @@ rm data.zip
 
 python3 tfpc/convertor.py
 cd tfpc
-# run in background
+python3 blastp.py
 python3 training.py data/models/fine_tune_models/mine_100/config.json &
 python3 training.py data/models/fine_tune_models/mine_30/config.json &
-python3 blastp.py
 cd ../
 
 python3 tfpc/predictions.py --cluster 30 --dataset price-149 --chosen_model mine_30 --fasta_path data/price-149.fasta --enzyme_a_priori --output_folder_path results/tfpc --max_seq_lenght 2048 --verbose
