@@ -18,6 +18,19 @@ logging.getLogger().setLevel(logging.INFO)
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
+    "--cluster",
+    help="Similarity threshold (e.g., 100, 30)",
+    type=str,
+    required=True
+)
+
+parser.add_argument(
+    "--dataset",
+    help="Dataset type: price-149, test, ens",
+    type=str,
+    required=True
+)
+parser.add_argument(
     "--chosen_model",
     help="Which models to use: EnzBert_SwissProt_2016_08, EnzBert_SwissProt_2018_01, EnzBert_SwissProt_2021_04, EnzBert_EC40, EnzBert_ECPred40",
     type=Path,
@@ -26,12 +39,6 @@ parser.add_argument(
 parser.add_argument(
     "--fasta_path",
     help="Fasta file with the sequences",
-    type=Path,
-)
-parser.add_argument(
-    "--output_folder_path",
-    help="Path of the csv output prediction",
-    default="tfpc/data/predictions.csv",
     type=Path,
 )
 parser.add_argument(
@@ -55,6 +62,10 @@ parser.add_argument(
     action="store_true",
 )
 args = parser.parse_args()
+
+# Create dynamic output directory
+output_folder_path = Path(f"mine_{args.cluster}/{args.dataset}/")
+output_folder_path.mkdir(parents=True, exist_ok=True)
 
 if args.chosen_model == "EnzBert_EC40":
     lvl = 2

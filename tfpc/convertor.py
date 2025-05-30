@@ -38,10 +38,10 @@ valid = valid.assign(ec_number=valid['ec_number'].str.split(',')).explode('ec_nu
 
 if not os.path.exists('tfpc/data/datasets/mine_30'):
     os.makedirs('tfpc/data/datasets/mine_30')
-convert_csv_to_json(train, 'tfpc/data/datasets/mine_30/mine_30_train.json')
-convert_csv_to_json(valid, 'tfpc/data/datasets/mine_30/mine_30_valid.json')
-convert_csv_to_json(test, 'tfpc/data/datasets/mine_30/mine_30_test.json')
-convert_csv_to_json(train_blastp, 'tfpc/data/datasets/mine_30/mine_30_train_blastp.json')
+convert_csv_to_json(train, 'tfpc/data/datasets/mine_30/train.json')
+convert_csv_to_json(valid, 'tfpc/data/datasets/mine_30/valid.json')
+convert_csv_to_json(test, 'tfpc/data/datasets/mine_30/test.json')
+convert_csv_to_json(train_blastp, 'tfpc/data/datasets/mine_30/train_blastp.json')
 if not os.path.exists('tfpc/data/datasets/price_blastp.json'):
     convert_csv_to_json(price, 'tfpc/data/datasets/price_blastp.json')
 
@@ -69,9 +69,9 @@ valid = valid.assign(ec_number=valid['ec_number'].str.split(',')).explode('ec_nu
 
 if not os.path.exists('tfpc/data/datasets/mine_100'):
     os.makedirs('tfpc/data/datasets/mine_100')
-convert_csv_to_json(train, 'tfpc/data/datasets/mine_100/mine_100_train.json')
-convert_csv_to_json(valid, 'tfpc/data/datasets/mine_100/mine_100_valid.json')
-convert_csv_to_json(test, 'tfpc/data/datasets/mine_100/mine_100_test.json')
-convert_csv_to_json(train_blastp, 'tfpc/data/datasets/mine_100/mine_100_train_blastp.json')
+convert_csv_to_json(train, 'tfpc/data/datasets/mine_100/train.json')
+convert_csv_to_json(valid, 'tfpc/data/datasets/mine_100/valid.json')
+convert_csv_to_json(test, 'tfpc/data/datasets/mine_100/test.json')
+convert_csv_to_json(train_blastp, 'tfpc/data/datasets/mine_100/train_blastp.json')
 if not os.path.exists('tfpc/data/datasets/price_blastp.json'):
     convert_csv_to_json(price, 'tfpc/data/datasets/price_blastp.json')

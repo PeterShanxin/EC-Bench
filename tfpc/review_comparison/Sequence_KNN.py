@@ -24,8 +24,8 @@ class SequenceKNN:
         self.nb_thread = nb_thread
         if not os.path.exists(tmp_folder):
             os.mkdir(tmp_folder)
-        self.name_fasta_train = "train_task3.fasta"
-        self.name_fasta_test = "test_task3.fasta"
+        self.name_fasta_train = "train.fasta"
+        self.name_fasta_test = "test.fasta"
         self.path_fasta_train = tmp_folder / Path(self.name_fasta_train)
         self.path_fasta_test = tmp_folder / Path(self.name_fasta_test)
         self.output_querry = "res_blastp.txt"
@@ -37,8 +37,8 @@ class SequenceKNN:
         self.create_blast_db()
         generate_fasta_file(df=self.df_test, fasta_path=self.name_fasta_test)
         self.querry_seq()
-        #self.parse_res_and_get_pred()
-        #shutil.rmtree(self.tmp_folder)
+        # self.parse_res_and_get_pred()
+        # shutil.rmtree(self.tmp_folder)
 
     def create_blast_db(self):
         os.chdir(self.tmp_folder)
@@ -66,7 +66,7 @@ class SequenceKNN:
                     + str(self.nb_thread)
                     # + " -mt_mode 1" # Deprecated options? not working anymore
                 )
-        
+
             elif self.tool == "DIAMOND":
                 command = (
                     "diamond blastp -q "
@@ -134,7 +134,7 @@ class SequenceKNN:
                     if self.a_piori_enzyme:
                         ind = 1
                         while ind < len(list_ids):
-                            #while pred == "0.0.0.0" and ind < len(list_ids):
+                            # while pred == "0.0.0.0" and ind < len(list_ids):
                             pred = dico_train_id_to_ec[list_ids[ind]]
                             seq_identity = list_seq_seq_identity[ind]
                             ind += 1
@@ -144,6 +144,4 @@ class SequenceKNN:
                     seq_identity = 0.0
                 output_pred.write(
                     uniprot_id + "," + pred + "," + str(seq_identity) + "\n"
-                )        
-
-
+                )

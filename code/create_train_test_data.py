@@ -133,6 +133,18 @@ def create_data(data_path, train_ec_path, test_ec_path, train_3d_path, test_3d_p
     test_path = path + '/test_ec.csv'
     test.to_csv(test_path, index=False)
     print('test size: ', test.shape)
+    
+    # make fasta file from test in data_path named test_ec.fasta
+    test_fasta_path = os.path.join(data_path, f'test_ec.fasta')
+    with open(test_fasta_path, 'w') as f:
+        for index, row in test.iterrows():
+            f.write(f'>{row["id"]}\n{row["sequence"]}\n')
+    
+    # make fasta file from price in data_path named price-149.fasta
+    price_fasta_path = os.path.join(data_path, f'price-149.fasta')
+    with open(price_fasta_path, 'w') as f:
+        for index, row in price.iterrows():
+            f.write(f'>{row["id"]}\n{row["sequence"]}\n')
 
     if ensemble_file_path:
         # remove the sequences that are similar to the test sequences
@@ -141,6 +153,11 @@ def create_data(data_path, train_ec_path, test_ec_path, train_3d_path, test_3d_p
         ensemble_path = path + '/ensemble_ec.csv'
         ensemble.to_csv(ensemble_path, index=False)
         print('ensemble size: ', ensemble.shape)
+        # make fasta file from ensemble in data_path named ens_{t}.fasta
+        ensemble_fasta_path = os.path.join(data_path, f'ens-{t}.fasta')
+        with open(ensemble_fasta_path, 'w') as f:
+            for index, row in ensemble.iterrows():
+                f.write(f'>{row["id"]}\n{row["sequence"]}\n')
 
     # Step 2 - save train and test data with 3d information
     train_info_list = []
