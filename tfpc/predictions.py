@@ -8,7 +8,7 @@ import numpy as np
 import sys
 from interpretability.utils import (
     set_hook_to_get_attention_map,
-    get_attentions_map_simple
+    get_attentions_map_simple,
 )
 
 sys.path.append("tfpc/models_architectures/")
@@ -18,17 +18,11 @@ logging.getLogger().setLevel(logging.INFO)
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "--cluster",
-    help="Similarity threshold (e.g., 100, 30)",
-    type=str,
-    required=True
+    "--cluster", help="Similarity threshold (e.g., 100, 30)", type=str, required=True
 )
 
 parser.add_argument(
-    "--dataset",
-    help="Dataset type: price-149, test, ens",
-    type=str,
-    required=True
+    "--dataset", help="Dataset type: price-149, test, ens", type=str, required=True
 )
 parser.add_argument(
     "--chosen_model",
@@ -51,7 +45,9 @@ parser.add_argument(
     "--enzyme_a_priori", help="If we know the sequences are enzyme", action="store_true"
 )
 parser.add_argument(
-    "--output_attentions_scores", help="Compute and outputs attentions scores", action="store_true"
+    "--output_attentions_scores",
+    help="Compute and outputs attentions scores",
+    action="store_true",
 )
 parser.add_argument(
     "--top_k", help="How many prediction per sequence", default=10, type=int
@@ -116,7 +112,7 @@ if args.output_attentions_scores:
         ancienne_fonciton_lib,
     ) = set_hook_to_get_attention_map(model)
 
-    output_scores = open(args.output_folder_path/Path("attentions_scores.csv"),"w")
+    output_scores = open(args.output_folder_path / Path("attentions_scores.csv"), "w")
     output_scores.write("seqid,attentions_scores\n")
 
 
@@ -133,7 +129,7 @@ else:
 inv_class_vocab = {ind: ec_number for ec_number, ind in class_vocab.items()}
 inv_class_vocab_inv = {ec_number: ind for ec_number, ind in class_vocab.items()}
 # save inv_class_vocab_inv to a csv file: ec_number, ind
-with open(args.output_folder_path/Path("dict_annot.csv"), "w") as f:
+with open(args.output_folder_path / Path("dict_annot.csv"), "w") as f:
     for ec_number, ind in inv_class_vocab_inv.items():
         f.write(f"{ec_number},{ind}\n")
 
@@ -141,7 +137,7 @@ pad_indice = vocab["p"]
 
 logging.info("Create the output prediction file")
 fichier_output = open(
-    args.output_folder_path/Path("predictions.csv"),
+    args.output_folder_path / Path("predictions.csv"),
     "w",
 )
 
@@ -149,7 +145,7 @@ fichier_output.write("seqid,pred_ec,probability,class_weight,rank\n")
 
 logging.info("Create the output prediction file with top k")
 fichier_output_top = open(
-    args.output_folder_path/Path("predictions_top"+str(args.top_k)+".csv"),
+    args.output_folder_path / Path("predictions_top" + str(args.top_k) + ".csv"),
     "w",
 )
 
@@ -204,34 +200,31 @@ with torch.no_grad():
                     + str(class_weight)
                     + ",0\n"
                 )
-            if args.output_attentions_scores :
-                    attentions_map = get_attentions_map_simple(
-                        activation,
-                        nb_layer,
-                        input_batch,
-                        pad_indice,
-                    )
-                    
-                    first_agreg = np.mean(attentions_map,axis=0)
-                    second_agreg = np.mean(first_agreg,axis=0)
-                    list_scores = list(second_agreg)
-                    output_scores.write( id
-                        + ',"'
-                        + str(list_scores)
-                        +'"\n')
+            if args.output_attentions_scores:
+                attentions_map = get_attentions_map_simple(
+                    activation,
+                    nb_layer,
+                    input_batch,
+                    pad_indice,
+                )
+
+                first_agreg = np.mean(attentions_map, axis=0)
+                second_agreg = np.mean(first_agreg, axis=0)
+                list_scores = list(second_agreg)
+                output_scores.write(id + ',"' + str(list_scores) + '"\n')
             if args.verbose:
                 print("-" * 90)
                 print("fasta_ids:", fasta_ids)
                 print("Sequence:", sequence)
                 print("Predicted ec:", ec_prediction)
                 print("With a weight of:", class_weight)
-                print("With a probability of:", round(probability * 100, 3), "%")    
+                print("With a probability of:", round(probability * 100, 3), "%")
             if probability < 0.8:
                 break
             else:
                 i += 1
-        
-        '''
+
+        """
         for rank in range(args.top_k):
             current_ind = sorted_weight[rank]
             ec_prediction = inv_class_vocab[current_ind]
@@ -276,10 +269,10 @@ with torch.no_grad():
                 print("Predicted ec:", ec_prediction)
                 print("With a weight of:", class_weight)
                 print("With a probability of:", round(probability * 100, 3), "%")
-        '''
+        """
     y_pred_all = np.array(y_pred_all)
     # save y_pred_all to a file npy
-    np.save(args.output_folder_path/Path("y_pred.npy"), y_pred_all)
+    np.save(args.output_folder_path / Path("y_pred.npy"), y_pred_all)
 
 
 fichier_output.close()
