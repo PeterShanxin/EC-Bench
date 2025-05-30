@@ -23,7 +23,6 @@ export PATH=$BLAST_DIR:$PATH
 
 # Set up PRIAM directory
 PRIAM_DIR=priam
-mkdir -p $PRIAM_DIR
 
 # Download and unzip PRIAM if not already present
 if [ ! -f "$PRIAM_DIR/README.txt" ]; then
