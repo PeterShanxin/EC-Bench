@@ -131,7 +131,11 @@ The EC-Bench framework includes a standardized pipeline for preparing pretrainin
 - [License](#license)
 
 ## Installation
-1. Install [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/)
+1. Install [conda](https://docs.conda.io/projects/conda/en/latest/user-guide/install/) and [RDKit](https://www.rdkit.org/docs/Install.html) (for reaction similarity calculation).
+   - For RDKit, you can use conda to install it:
+   ```
+   conda install -c conda-forge rdkit
+   ```
 2. Clone the repository  
 ```
 git clone https://github.com/dsaeedeh/EC-Bench.git
