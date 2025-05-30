@@ -173,6 +173,10 @@ After running the above steps, you can find the final data in the data directory
 
 
 ### Training the models
+Each model has a run_model.sh script that contains the commands to run the model. You can run each model by executing the respective script or you can run all_models.sh script to run all models. For example, to run all models, you can use:
+```
+sbatch all_models.sh
+```
 
 
 ## Contributing
