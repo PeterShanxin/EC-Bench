@@ -49,7 +49,7 @@ Fill in missing parts of partial EC numbers. Since ground truth may be unavailab
 - **Coverage**: Fraction of proteins for which a complete EC number was generated.
 - **Agreement Rate**: Percentage of completions where a majority of models agree.
 
-### 3. Partial/Complete EC Number Recommendation
+### 3. Partial/Additional EC Number Recommendation
 Suggest novel or alternate EC numbers. Evaluated via:
 
 - **Reaction Similarity Score**: Computed using RDKit and reactions from ECReact.
