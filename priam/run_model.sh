@@ -37,8 +37,8 @@ fi
 
 
 cd priam
-java -jar PRIAM_search.jar -n "price-149" -i ../data/price-149.fasta -p PRIAM_MAR13 -o "../results/priam" --pt 0 --mp 60 --cc T --bd ../blast-2.2.26/bin --np 112
-java -jar PRIAM_search.jar -n "test" -i ../data/test_ec.fasta -p PRIAM_MAR13 -o "../results/priam" --pt 0 --mp 60 --cc T --bd ../blast-2.2.26/bin --np 112
+java -jar PRIAM_search.jar -n "price-149" -i ../data/price-149.fasta -p PRIAM_MAR13 -o "../results/priam" --pt 0 --mp 60 --cc T --bd ../blast-2.2.26/bin --np 1
+java -jar PRIAM_search.jar -n "test" -i ../data/test_ec.fasta -p PRIAM_MAR13 -o "../results/priam" --pt 0 --mp 60 --cc T --bd ../blast-2.2.26/bin --np 1
 mv RESULTS ../results/priam
 echo "PRIAM search completed. Results are in ../results/priam"
 cd ../

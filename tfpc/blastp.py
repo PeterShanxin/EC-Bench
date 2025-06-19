@@ -11,7 +11,7 @@ def generate_all_predictions(path_train, path_test, path_output):
     blast_p = SequenceKNN(
         path_train_json=path_train,
         path_test_json=path_test,
-        nb_thread=112,
+        nb_thread=1,
         path_output_pred=path_output,
         tool="DIAMOND",
         a_priori_enzyme=True,
