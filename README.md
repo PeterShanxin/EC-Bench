@@ -1,3 +1,5 @@
+[![bioRxiv Preprint](https://img.shields.io/badge/bioRxiv-Preprint-orange)](https://www.biorxiv.org/content/10.1101/2025.06.25.661207v1)
+
 # EC-Bench: A Benchmark for Enzyme Commission Number Prediction
 
 **EC-Bench** is a benchmark framework for evaluating enzyme annotation models that predict Enzyme Commission (EC) numbers from protein sequences. EC numbers describe the biochemical reactions enzymes catalyze, and predicting them accurately is essential for understanding protein function.
