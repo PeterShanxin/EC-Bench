@@ -1,4 +1,4 @@
-[![bioRxiv Preprint](https://img.shields.io/badge/bioRxiv-Preprint-orange)](https://www.biorxiv.org/content/10.1101/2025.06.25.661207v1)
+[![bioinformatics advances](https://academic.oup.com/bioinformaticsadvances/advance-article/doi/10.1093/bioadv/vbag004/8417619)
 
 # EC-Bench: A Benchmark for Enzyme Commission Number Prediction
 
@@ -209,8 +209,8 @@ If you use EC-Bench in your research, please cite the following:
 @article{EC-Bench,
   title={EC-Bench: A Benchmark for Enzyme Commission Number Prediction},
   author={Saeedeh Davoudi et al.},
-  journal={bioRxiv 2025.06.25.661207; doi: https://doi.org/10.1101/2025.06.25.661207},
-  year={2025}
+  journal={Bioinformatics Advances; doi: https://doi.org/10.1093/bioadv/vbag004},
+  year={2026}
 }
 ```
 
