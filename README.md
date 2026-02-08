@@ -1,4 +1,4 @@
-![bioinformatics advances](https://academic.oup.com/bioinformaticsadvances/advance-article/doi/10.1093/bioadv/vbag004/8417619)
+[bioinformatics advances](https://academic.oup.com/bioinformaticsadvances/advance-article/doi/10.1093/bioadv/vbag004/8417619)
 
 # EC-Bench: A Benchmark for Enzyme Commission Number Prediction
 
