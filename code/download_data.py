@@ -65,14 +65,14 @@ if year3:
     shutil.move(f"uniprot_sprot{year3}_{month3}.data.gz", output_dir + f"/uniprot_sprot{year3}_{month3}.data.gz")
 
 # Download alphafold structures (PDB files) for SwissprotKB: 
-pdb_url = f"https://ftp.ebi.ac.uk/pub/databases/alphafold/latest/swissprot_pdb_v4.tar" 
-urllib.request.urlretrieve(pdb_url, output_dir + f"/swissprot_pdb_v4.tar") 
+pdb_url = f"https://ftp.ebi.ac.uk/pub/databases/alphafold/latest/swissprot_pdb_v6.tar" 
+urllib.request.urlretrieve(pdb_url, output_dir + f"/swissprot_pdb_v6.tar") 
  
 # Extract alphafold structures (PDB files) for SwissprotKB: 
-tar_file = output_dir + f"/swissprot_pdb_v4.tar" 
+tar_file = output_dir + f"/swissprot_pdb_v6.tar" 
 with tarfile.open(tar_file, "r:") as tar: 
-    tar.extract("swissprot_pdb_v4") 
-shutil.move("swissprot_pdb_v4/", output_dir + "/swissprot_pdb_v4")
+    tar.extract("swissprot_pdb_v6") 
+shutil.move("swissprot_pdb_v6/", output_dir + "/swissprot_pdb_v6")
 
 # download GO terms from: https://ftp.ebi.ac.uk/pub/databases/GO/goa/UNIPROT/goa_uniprot_all.gaf.gz and extract it
 url = 'https://ftp.ebi.ac.uk/pub/databases/GO/goa/UNIPROT/goa_uniprot_all.gaf.gz'
