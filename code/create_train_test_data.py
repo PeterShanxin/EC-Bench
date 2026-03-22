@@ -6,6 +6,15 @@ import ahocorasick
 import psutil
 import os
 
+
+def _get_sequence_column(df, dataset_name):
+    if 'sequence' in df.columns:
+        return 'sequence'
+    if 'seq' in df.columns:
+        return 'seq'
+    raise KeyError(f"{dataset_name} is missing a sequence column; expected one of: sequence, seq")
+
+
 def monitor_usage():
     # Monitor RAM usage
     used_memory = psutil.virtual_memory()
@@ -56,8 +65,12 @@ def create_data(data_path, train_ec_path, test_ec_path, train_3d_path, test_3d_p
     train = pd.read_csv(train_ec_path)
     test = pd.read_csv(test_ec_path)
     price = pd.read_csv(price_file_path)
+    train_seq_col = _get_sequence_column(train, 'train')
+    test_seq_col = _get_sequence_column(test, 'test')
+    price_seq_col = _get_sequence_column(price, 'price')
     if ensemble_file_path:
         ensemble = pd.read_csv(ensemble_file_path)
+        ensemble_seq_col = _get_sequence_column(ensemble, 'ensemble')
     test_ids = list(test['id'])
     price_ids = list(price['id'])
     test_ids.extend(price_ids)
@@ -107,11 +120,12 @@ def create_data(data_path, train_ec_path, test_ec_path, train_3d_path, test_3d_p
                         auto.add_word(substr, substr)
                     break
         ids_to_remove = list(set(ids_to_remove))
-        print('ids to remove: ', ids_to_remove)
+        preview = ids_to_remove[:10]
+        print(f'ids to remove after threshold {threshold}: {len(ids_to_remove)} (preview: {preview})')
         del clusters
     
     # save the ids_to_remove in a tsv file
-    ids_to_remove_path = os.path.join(data_path, 'cluster-{t}/ids_to_remove.txt')
+    ids_to_remove_path = os.path.join(data_path, f'cluster-{t}/ids_to_remove.txt')
     with open(ids_to_remove_path, 'w') as f:
         for id in ids_to_remove:
             f.write(f'{id}\n')
@@ -138,13 +152,13 @@ def create_data(data_path, train_ec_path, test_ec_path, train_3d_path, test_3d_p
     test_fasta_path = os.path.join(data_path, f'test_ec.fasta')
     with open(test_fasta_path, 'w') as f:
         for index, row in test.iterrows():
-            f.write(f'>{row["id"]}\n{row["sequence"]}\n')
+            f.write(f'>{row["id"]}\n{row[test_seq_col]}\n')
     
     # make fasta file from price in data_path named price-149.fasta
     price_fasta_path = os.path.join(data_path, f'price-149.fasta')
     with open(price_fasta_path, 'w') as f:
         for index, row in price.iterrows():
-            f.write(f'>{row["id"]}\n{row["sequence"]}\n')
+            f.write(f'>{row["id"]}\n{row[price_seq_col]}\n')
 
     if ensemble_file_path:
         # remove the sequences that are similar to the test sequences
@@ -157,21 +171,11 @@ def create_data(data_path, train_ec_path, test_ec_path, train_3d_path, test_3d_p
         ensemble_fasta_path = os.path.join(data_path, f'ens-{t}.fasta')
         with open(ensemble_fasta_path, 'w') as f:
             for index, row in ensemble.iterrows():
-                f.write(f'>{row["id"]}\n{row["sequence"]}\n')
+                f.write(f'>{row["id"]}\n{row[ensemble_seq_col]}\n')
 
     # Step 2 - save train and test data with 3d information
-    train_info_list = []
-    test_info_list = []
-    
-    for i in range(train.shape[0]):
-        if train.iloc[i, 0] in info.keys():
-            train_info_list.append(info[train.iloc[i, 0]])
-    for i in range(test.shape[0]):
-        if test.iloc[i, 0] in info.keys():
-            test_info_list.append(info[test.iloc[i, 0]])
-
-    train['3d_info'] = train_info_list
-    test['3d_info'] = test_info_list
+    train['3d_info'] = train['id'].map(info)
+    test['3d_info'] = test['id'].map(info)
     
     train_path = path + '/train_ec_3d.csv'
     train.to_csv(train_path, index=False)
@@ -192,7 +196,8 @@ if __name__ == '__main__':
     parser.add_argument('--train_3d_name', type=str, default='train_having_3d.fasta', help='Name of train 3d data')
     parser.add_argument('--test_3d_name', type=str, default='test_having_3d.fasta', help='Name of test 3d data')
     parser.add_argument('--info_file_name', type=str, default='swissprot_coordinates.json', help='Name of all 3d coordinates file')
-    parser.add_argument('--threshod', type=int, default=30)
+    parser.add_argument('--threshod', dest='threshold', type=int, default=30)
+    parser.add_argument('--threshold', dest='threshold', type=int, help='Alias for --threshod')
     args = parser.parse_args()
 
     create_clusters(cluster_path_100=os.path.join(args.data_path, 'cluster-100/clusterEns_cluster.tsv'), cluster_path_90=os.path.join(args.data_path, 'cluster-90/clusterEns_cluster.tsv'), cluster_path_70=os.path.join(args.data_path, 'cluster-70/clusterEns_cluster.tsv'), cluster_path_50=os.path.join(args.data_path, 'cluster-50/clusterEns_cluster.tsv'), cluster_path_30=os.path.join(args.data_path, 'cluster-30/clusterEns_cluster.tsv'), data_path=args.data_path)

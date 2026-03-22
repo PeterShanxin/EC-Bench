@@ -158,22 +158,15 @@ def merge(data_path, file1 = 'pretrain.csv', file2 = 'pretrain_go_frequent_8943.
     merged_df = pd.merge(df1, df2, on='id', how='left')
 
     # Step 3: Fill missing 'go_terms' with "-"
-    merged_df['go_terms'].fillna("-", inplace=True)
+    merged_df['go_terms'] = merged_df['go_terms'].fillna("-")
 
     # Optional: Save the merged DataFrame to a new CSV file
     output_file = data_path + '/pretrain_go_final.csv'
     merged_df.to_csv(output_file, index=False)
 
-    # Display the merged DataFrame
-    print(len(merged_df))
-    
-    unique_ids_df1 = df1['id'].unique().tolist()
-    unique_ids_df2 = df2['id'].unique().tolist()    
-    all_ids_in_df2 = all(id in unique_ids_df1 for id in unique_ids_df2)
-
-    # Print the result
-    if all_ids_in_df2:
-        print("All IDs in df2 are present in df1.")
+    annotated_rows = int((merged_df['go_terms'] != "-").sum())
+    print(f"pretrain_go_final rows: {len(merged_df)}")
+    print(f"pretrain_go_final rows with GO terms: {annotated_rows}")
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='GO Creator')
@@ -185,7 +178,6 @@ if __name__ == '__main__':
     filter_frequent_pretrain(args.data_path)
     filter_most_frequent(args.data_path)
     merge(args.data_path)
-
 
 
 

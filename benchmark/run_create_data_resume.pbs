@@ -1,0 +1,73 @@
+#!/bin/bash
+#
+# Resume EC-Bench data prep from create_data + go_creator on Hopper.
+#
+
+#PBS -N ecbench_create
+#PBS -q auto
+#PBS -P CFP03-SF-097
+#PBS -l select=1:ngpus=1:ncpus=12:mem=225GB
+#PBS -l walltime=48:00:00
+#PBS -j oe
+#PBS -o /home/svu/e0969321/ecbench_create_hopper.log
+#PBS -V
+
+set -euo pipefail
+
+SCRATCH_ROOT="${SCRATCH_ROOT:-/scratch/e0969321/ecbench_hopper_h100_task1_runtime_20260313}"
+WORKTREE_ROOT="${SCRATCH_ROOT}/data_prep/ecbench_worktree"
+LOG_ROOT="${SCRATCH_ROOT}/data_prep/logs"
+MARKER_ROOT="${SCRATCH_ROOT}/data_prep/markers"
+CREATE_MARKER="${MARKER_ROOT}/create_data.done"
+GO_MARKER="${MARKER_ROOT}/go_creator.done"
+
+cd "${WORKTREE_ROOT}"
+
+source "${SCRATCH_ROOT}/venv_cpu/bin/activate"
+export PYTHONPATH="/home/svu/e0969321/EC-Bench:${PYTHONPATH:-}"
+export OMP_NUM_THREADS="${PBS_NCPUS:-12}"
+export MKL_NUM_THREADS="${OMP_NUM_THREADS}"
+export OPENBLAS_NUM_THREADS="${OMP_NUM_THREADS}"
+export NUMEXPR_NUM_THREADS="${OMP_NUM_THREADS}"
+
+mkdir -p "${LOG_ROOT}" "${MARKER_ROOT}"
+
+if [ ! -f "${CREATE_MARKER}" ]; then
+  python code/create_train_test_data.py --data_path data --ensemble_file_name ensemble.csv --threshold 30 >> "${LOG_ROOT}/create_data.log" 2>&1
+  python code/create_train_test_data.py --data_path data --ensemble_file_name ensemble.csv --threshold 100 >> "${LOG_ROOT}/create_data.log" 2>&1
+  date -u +"%Y-%m-%dT%H:%M:%SZ" > "${CREATE_MARKER}"
+else
+  echo "[run_create_data_resume] create_data marker already present; skipping create_data." >> "${LOG_ROOT}/create_data.log"
+fi
+
+go_outputs_ready=1
+for required in \
+  data/filtered_goa.csv \
+  data/pretrain_go.csv \
+  data/pretrain_go_frequent.csv \
+  data/pretrain_go_frequent_8943.csv \
+  data/frequent_go_terms.pkl \
+  data/8943_frequent_go_terms.pkl \
+  data/pretrain_go_final.csv
+do
+  if [ ! -s "${required}" ]; then
+    go_outputs_ready=0
+    break
+  fi
+done
+
+if [ -f "${GO_MARKER}" ]; then
+  echo "[run_create_data_resume] go_creator marker already present; skipping go_creator." >> "${LOG_ROOT}/go_creator.log"
+elif [ "${go_outputs_ready}" -eq 1 ]; then
+  echo "[run_create_data_resume] detected existing go_creator outputs; restoring marker without recomputing." >> "${LOG_ROOT}/go_creator.log"
+  date -u +"%Y-%m-%dT%H:%M:%SZ" > "${GO_MARKER}"
+else
+  python code/go_creator.py --data_path data >> "${LOG_ROOT}/go_creator.log" 2>&1
+  date -u +"%Y-%m-%dT%H:%M:%SZ" > "${GO_MARKER}"
+fi
+
+python -m benchmark.prepare_data_hopper \
+  --ecbench-root /home/svu/e0969321/EC-Bench \
+  --scratch-root "${SCRATCH_ROOT}" \
+  --manifest-out "${SCRATCH_ROOT}/data_prep/data_prep_manifest.json" \
+  --resume

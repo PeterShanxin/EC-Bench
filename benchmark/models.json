@@ -1,0 +1,132 @@
+[
+  {
+    "model_id": "blastp",
+    "display_name": "Diamond-BLASTp",
+    "task1_source": "official_csv",
+    "task1_column": "blastp",
+    "family": "search",
+    "training_unit": "none",
+    "runtime_artifact_globs": [
+      "deepectransformer/model/swissprot_enzyme_diamond.dmnd"
+    ],
+    "notes": "Canonical base-roster BLASTp column from bundled EC-Bench Task 1 release CSV."
+  },
+  {
+    "model_id": "catfam",
+    "display_name": "CatFam",
+    "task1_source": "official_csv",
+    "task1_column": "catfam",
+    "family": "rule",
+    "training_unit": "none",
+    "runtime_artifact_globs": [
+      "CatFam/CatFamDB/**/*"
+    ],
+    "notes": "Canonical CatFam column from bundled EC-Bench Task 1 release CSV."
+  },
+  {
+    "model_id": "priam",
+    "display_name": "PRIAM",
+    "task1_source": "official_csv",
+    "task1_column": "priam",
+    "family": "profile",
+    "training_unit": "none",
+    "runtime_artifact_globs": [
+      "priam/PRIAM_*",
+      "priam/RESULTS/**/*"
+    ],
+    "notes": "Canonical PRIAM column from bundled EC-Bench Task 1 release CSV."
+  },
+  {
+    "model_id": "deepec",
+    "display_name": "DeepEC",
+    "task1_source": "official_csv",
+    "task1_column": "deepec",
+    "family": "neural",
+    "training_unit": "epoch",
+    "runtime_artifact_globs": [
+      "DeepEC/**/*"
+    ],
+    "notes": "Canonical DeepEC column from bundled EC-Bench Task 1 release CSV."
+  },
+  {
+    "model_id": "deepectransformer",
+    "display_name": "DeepECTransformer",
+    "task1_source": "official_csv",
+    "task1_column": "deepectransformer-regular",
+    "family": "neural",
+    "training_unit": "epoch",
+    "runtime_artifact_globs": [
+      "deepectransformer/model/**/*"
+    ],
+    "notes": "Pinned to the regular variant for the paper-facing base roster."
+  },
+  {
+    "model_id": "ecpred",
+    "display_name": "ECPred",
+    "task1_source": "official_csv",
+    "task1_column": "ecpred",
+    "family": "ml",
+    "training_unit": "none",
+    "runtime_artifact_globs": [
+      "ECPred/**/*"
+    ],
+    "notes": "Canonical ECPred column from bundled EC-Bench Task 1 release CSV."
+  },
+  {
+    "model_id": "ecrecer",
+    "display_name": "ECRECer",
+    "task1_source": "official_csv",
+    "task1_column": "ecrecer",
+    "family": "neural",
+    "training_unit": "epoch",
+    "runtime_artifact_globs": [
+      "ECRECer/**/*"
+    ],
+    "notes": "Canonical ECRECer column from bundled EC-Bench Task 1 release CSV."
+  },
+  {
+    "model_id": "proteinbert",
+    "display_name": "ProteinBERT",
+    "task1_source": "official_csv",
+    "task1_column": "proteinbert-regular",
+    "family": "neural",
+    "training_unit": "epoch",
+    "runtime_artifact_globs": [
+      "proteinBERT/**/*"
+    ],
+    "notes": "Pinned to the regular variant for the paper-facing base roster."
+  },
+  {
+    "model_id": "enzbert",
+    "display_name": "EnzBERT",
+    "task1_source": "official_csv",
+    "task1_column": "enzbert-regular",
+    "family": "neural",
+    "training_unit": "epoch",
+    "runtime_artifact_globs": [
+      "tfpc/data/models/**/*"
+    ],
+    "notes": "Pinned to the regular variant for the paper-facing base roster."
+  },
+  {
+    "model_id": "clean",
+    "display_name": "CLEAN",
+    "task1_source": "official_csv",
+    "task1_column": "clean-supcon",
+    "family": "contrastive",
+    "training_unit": "epoch",
+    "runtime_artifact_globs": [
+      "CLEAN/data/**/*"
+    ],
+    "notes": "Pinned to the SupCon variant for the paper-facing base roster."
+  },
+  {
+    "model_id": "protoec",
+    "display_name": "ProtoEC",
+    "task1_source": "protoec_adapter",
+    "family": "fewshot",
+    "training_unit": "episode",
+    "runtime_artifact_globs": [],
+    "notes": "External adapter backed by /home/svu/e0969321/FYP-fewshotlearn."
+  }
+]

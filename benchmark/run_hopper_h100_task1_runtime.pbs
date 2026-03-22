@@ -1,0 +1,48 @@
+#!/bin/bash
+#
+# Hopper H100-only benchmark wrapper for ProtoEC Task 1 runtime collection.
+#
+
+#PBS -N ecbench_h100
+#PBS -q auto
+#PBS -P CFP03-SF-097
+#PBS -l select=1:ngpus=1:gpu_model=H100
+#PBS -l walltime=48:00:00
+#PBS -j oe
+#PBS -o /scratch/e0969321/ecbench_h100_runtime.log
+#PBS -V
+
+set -euo pipefail
+
+cd "$PBS_O_WORKDIR"
+
+module purge || true
+module load singularity
+
+IMAGE="${SINGULARITY_IMAGE:-/app1/common/singularity-img/hopper/pytorch/pytorch_2.3.0_cuda_12.4_ngc_24.04.sif}"
+SCRATCH_ROOT="${SCRATCH_ROOT:-/scratch/e0969321/ecbench_hopper_h100_task1_runtime_20260313}"
+OUT_ROOT="${OUT_ROOT:-/home/svu/e0969321/FYP-fewshotlearn/results/ecbench_hopper_h100_task1_runtime_20260313}"
+VENV_ROOT="${SCRATCH_ROOT}/venv_gpu"
+
+if [ ! -x "${VENV_ROOT}/bin/python" ]; then
+  singularity exec -e --nv "${IMAGE}" python3 -m venv "${VENV_ROOT}"
+fi
+singularity exec -e --nv "${IMAGE}" bash -lc "
+  set -euo pipefail
+  source '${VENV_ROOT}/bin/activate'
+  python -m pip install --upgrade pip
+  python -m pip install -r /home/svu/e0969321/FYP-fewshotlearn/requirements.txt
+"
+
+singularity exec -e --nv "${IMAGE}" bash -lc "
+  set -euo pipefail
+  source '${VENV_ROOT}/bin/activate'
+  export BENCHMARK_CONTAINER_IMAGE='${IMAGE}'
+  export SCRATCH_ROOT='${SCRATCH_ROOT}'
+  export OUT_ROOT='${OUT_ROOT}'
+  export ECBENCH_ROOT='/home/svu/e0969321/EC-Bench'
+  export PREPARED_ECBENCH_ROOT='${SCRATCH_ROOT}/data_prep/ecbench_worktree'
+  export FYP_ROOT='/home/svu/e0969321/FYP-fewshotlearn'
+  cd '/home/svu/e0969321/EC-Bench'
+  bash benchmark/launch_protoec_runtime.sh
+"
