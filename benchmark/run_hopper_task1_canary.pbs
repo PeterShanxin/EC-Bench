@@ -1,15 +1,16 @@
 #!/bin/bash
 #
-# Hopper H100-only benchmark wrapper for ProtoEC Task 1 runtime collection.
+# Hopper GPU canary wrapper for ProtoEC Task 1 runtime collection.
+# Uses any currently available Hopper GPU and records the actual GPU model.
 #
 
-#PBS -N ecbench_h100
+#PBS -N ecbench_canary
 #PBS -q auto
 #PBS -P CFP03-SF-097
-#PBS -l select=1:ngpus=1:gpu_model=H100
-#PBS -l walltime=48:00:00
+#PBS -l select=1:ngpus=1:ncpus=12:mem=225GB
+#PBS -l walltime=24:00:00
 #PBS -j oe
-#PBS -o /scratch/e0969321/ecbench_h100_runtime.log
+#PBS -o /home/svu/e0969321/ecbench_canary.log
 #PBS -V
 
 set -euo pipefail
@@ -20,9 +21,17 @@ module purge || true
 module load singularity
 
 IMAGE="${SINGULARITY_IMAGE:-/app1/common/singularity-img/hopper/pytorch/pytorch_2.3.0_cuda_12.4_ngc_24.04.sif}"
-SCRATCH_ROOT="${SCRATCH_ROOT:-/scratch/e0969321/ecbench_hopper_h100_task1_runtime_20260313}"
-OUT_ROOT="${OUT_ROOT:-/home/svu/e0969321/FYP-fewshotlearn/results/ecbench_hopper_h100_task1_runtime_20260313}"
+SCRATCH_ROOT="${SCRATCH_ROOT:-/scratch/e0969321/ecbench_hopper_task1_canary_20260322}"
+OUT_ROOT="${OUT_ROOT:-/home/svu/e0969321/FYP-fewshotlearn/results/ecbench_hopper_task1_canary_20260322}"
 PYUSERBASE="${SCRATCH_ROOT}/pyuserbase"
+PREPARED_ECBENCH_ROOT="${PREPARED_ECBENCH_ROOT:-/scratch/e0969321/ecbench_hopper_h100_task1_runtime_20260313/data_prep/ecbench_worktree}"
+DATA_PREP_MANIFEST="${DATA_PREP_MANIFEST:-/scratch/e0969321/ecbench_hopper_h100_task1_runtime_20260313/data_prep/data_prep_manifest.json}"
+PROTOEC_THRESHOLDS="${PROTOEC_THRESHOLDS:-100}"
+
+export OMP_NUM_THREADS="${PBS_NCPUS:-12}"
+export MKL_NUM_THREADS="${OMP_NUM_THREADS}"
+export OPENBLAS_NUM_THREADS="${OMP_NUM_THREADS}"
+export NUMEXPR_NUM_THREADS="${OMP_NUM_THREADS}"
 
 mkdir -p "${PYUSERBASE}"
 mkdir -p "${SCRATCH_ROOT}/cache" "${SCRATCH_ROOT}/torch_cache"
@@ -52,9 +61,11 @@ singularity exec -e --nv "${IMAGE}" bash --noprofile --norc -c "
   export SCRATCH_ROOT='${SCRATCH_ROOT}'
   export OUT_ROOT='${OUT_ROOT}'
   export ECBENCH_ROOT='/home/svu/e0969321/EC-Bench'
-  export PREPARED_ECBENCH_ROOT='${SCRATCH_ROOT}/data_prep/ecbench_worktree'
+  export PREPARED_ECBENCH_ROOT='${PREPARED_ECBENCH_ROOT}'
+  export DATA_PREP_MANIFEST='${DATA_PREP_MANIFEST}'
   export FYP_ROOT='/home/svu/e0969321/FYP-fewshotlearn'
-  export BENCHMARK_REQUIRE_H100='1'
+  export PROTOEC_THRESHOLDS='${PROTOEC_THRESHOLDS}'
+  export BENCHMARK_REQUIRE_H100='0'
   cd '/home/svu/e0969321/EC-Bench'
   bash benchmark/launch_protoec_runtime.sh
 "

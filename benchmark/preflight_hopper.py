@@ -89,8 +89,11 @@ def _cluster_gpu_summary() -> Dict[str, int]:
 
 
 def collect_preflight() -> Dict[str, object]:
-    hostname = socket.gethostname()
+    hostname = os.environ.get("BENCHMARK_NODE_NAME", "").strip() or socket.gethostname()
     gpu_rows = _parse_gpu_probe()
+    gpu_model_hint = os.environ.get("BENCHMARK_GPU_MODEL_HINT", "").strip()
+    if not gpu_rows and gpu_model_hint:
+        gpu_rows = [{"name": gpu_model_hint}]
     h100_detected = any("H100" in row.get("name", "").upper() for row in gpu_rows)
     payload: Dict[str, object] = {
         "timestamp_utc": datetime.now(timezone.utc).isoformat(),
@@ -109,6 +112,7 @@ def collect_preflight() -> Dict[str, object]:
         "gpu_probe": gpu_rows,
         "cluster_gpu_summary": _cluster_gpu_summary(),
         "h100_detected_on_current_node": h100_detected,
+        "gpu_model_hint": gpu_model_hint,
     }
     return payload
 

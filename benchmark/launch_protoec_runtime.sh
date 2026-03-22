@@ -6,9 +6,11 @@ FYP_ROOT="${FYP_ROOT:-/home/svu/e0969321/FYP-fewshotlearn}"
 SCRATCH_ROOT="${SCRATCH_ROOT:-/scratch/e0969321/ecbench_hopper_h100_task1_runtime_20260313}"
 OUT_ROOT="${OUT_ROOT:-/home/svu/e0969321/FYP-fewshotlearn/results/ecbench_hopper_h100_task1_runtime_20260313}"
 PREPARED_ECBENCH_ROOT="${PREPARED_ECBENCH_ROOT:-${SCRATCH_ROOT}/data_prep/ecbench_worktree}"
+DATA_PREP_MANIFEST="${DATA_PREP_MANIFEST:-${SCRATCH_ROOT}/data_prep/data_prep_manifest.json}"
 PROTOEC_CONFIG="${PROTOEC_CONFIG:-configs/config.ecbench.yaml}"
-PROTOEC_THRESHOLDS="${PROTOEC_THRESHOLDS:-100,30}"
+PROTOEC_THRESHOLDS="${PROTOEC_THRESHOLDS:-100}"
 BENCHMARK_CONTAINER_IMAGE="${BENCHMARK_CONTAINER_IMAGE:-}"
+BENCHMARK_REQUIRE_H100="${BENCHMARK_REQUIRE_H100:-0}"
 
 if [ ! -d "${PREPARED_ECBENCH_ROOT}" ]; then
   echo "[launch_protoec_runtime][error] prepared EC-Bench root not found: ${PREPARED_ECBENCH_ROOT}" >&2
@@ -27,7 +29,11 @@ MEASUREMENTS_DIR="${SCRATCH_ROOT}/measurements"
 LOGS_DIR="${SCRATCH_ROOT}/logs"
 mkdir -p "${MEASUREMENTS_DIR}" "${LOGS_DIR}"
 
-python -m benchmark.preflight_hopper --out "${SCRATCH_ROOT}/hardware_preflight.json" --require-h100
+PRECHECK_ARGS=(--out "${SCRATCH_ROOT}/hardware_preflight.json")
+if [ "${BENCHMARK_REQUIRE_H100}" = "1" ]; then
+  PRECHECK_ARGS+=(--require-h100)
+fi
+python -m benchmark.preflight_hopper "${PRECHECK_ARGS[@]}"
 
 bash "${ECBENCH_ROOT}/ProtoEC/run_model.sh" prepare --force-prepare
 
@@ -101,4 +107,4 @@ python -m benchmark.run_benchmark \
   --scratch-root "${SCRATCH_ROOT}" \
   --out-root "${OUT_ROOT}" \
   --protoec-manifest "${SCRATCH_ROOT}/protoec/adapter_manifest.json" \
-  --data-prep-manifest "${SCRATCH_ROOT}/data_prep/data_prep_manifest.json"
+  --data-prep-manifest "${DATA_PREP_MANIFEST}"

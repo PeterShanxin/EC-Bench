@@ -163,6 +163,10 @@ def main() -> None:
     env = _env_from_assignments(args.env)
     started_utc = datetime.now(timezone.utc).isoformat()
     gpu_probe = _gpu_probe()
+    gpu_model_hint = os.environ.get("BENCHMARK_GPU_MODEL_HINT", "").strip()
+    if not gpu_probe and gpu_model_hint:
+        gpu_probe = [{"name": gpu_model_hint}]
+    host_name = os.environ.get("BENCHMARK_NODE_NAME", "").strip() or socket.gethostname()
 
     with args.log_file.open("a", encoding="utf-8") as log_handle:
         log_handle.write(f"[measure] start_utc={started_utc}\n")
@@ -231,7 +235,7 @@ def main() -> None:
         "finished_utc": finished_utc,
         "duration_s": duration_s,
         "exit_code": exit_code,
-        "hostname": socket.gethostname(),
+        "hostname": host_name,
         "query_count": args.query_count,
         "per_protein_latency_ms": per_protein_latency_ms,
         "memory_usage_gib": memory_usage_gib,
@@ -250,6 +254,7 @@ def main() -> None:
         "container_image": os.environ.get("BENCHMARK_CONTAINER_IMAGE", ""),
         "pbs_jobid": os.environ.get("PBS_JOBID", ""),
         "pbs_queue": os.environ.get("PBS_QUEUE", ""),
+        "gpu_model_hint": gpu_model_hint,
     }
     write_json(args.json_out, payload)
 

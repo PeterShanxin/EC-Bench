@@ -4,6 +4,7 @@ import argparse
 import csv
 import json
 import os
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, Iterable, List, Tuple
@@ -28,6 +29,56 @@ from benchmark.preflight_hopper import collect_preflight
 
 def _load_manifest(path: Path) -> List[Dict[str, object]]:
     return json.loads(path.read_text(encoding="utf-8"))
+
+
+def _exit_ok(row: Dict[str, object]) -> bool:
+    value = row.get("exit_code")
+    try:
+        return int(value) == 0
+    except (TypeError, ValueError):
+        return False
+
+
+def _pbs_gpu_model_for_host(hostname: str) -> str:
+    if not hostname:
+        return ""
+    probe = subprocess.run(["pbsnodes", "-av"], capture_output=True, text=True, check=False)
+    if probe.returncode != 0:
+        return ""
+    short = hostname.split(".", 1)[0]
+    want = {hostname, short, f"{short}.cm.cluster"}
+    inside = False
+    for line in probe.stdout.splitlines():
+        stripped = line.strip()
+        if not line.startswith(" "):
+            inside = stripped in want
+            continue
+        if inside and "resources_available.gpu_model =" in stripped:
+            return stripped.split("=", 1)[1].strip()
+    return ""
+
+
+def _resolve_hardware_manifest(scratch_root: Path) -> Dict[str, object]:
+    preflight_path = scratch_root / "hardware_preflight.json"
+    if preflight_path.exists():
+        payload = read_json(preflight_path)
+        if isinstance(payload, dict):
+            payload = dict(payload)
+            gpu_probe = payload.get("gpu_probe")
+            hostname = str(payload.get("hostname", "") or "")
+            if (not isinstance(gpu_probe, list) or not gpu_probe) and hostname:
+                gpu_model = _pbs_gpu_model_for_host(hostname)
+                if gpu_model:
+                    payload["gpu_probe"] = [{"name": gpu_model}]
+            return payload
+    payload = collect_preflight()
+    hostname = str(payload.get("hostname", "") or "")
+    gpu_probe = payload.get("gpu_probe")
+    if (not isinstance(gpu_probe, list) or not gpu_probe) and hostname:
+        gpu_model = _pbs_gpu_model_for_host(hostname)
+        if gpu_model:
+            payload["gpu_probe"] = [{"name": gpu_model}]
+    return payload
 
 
 def _count_csv_rows(path: Path) -> int:
@@ -210,16 +261,16 @@ def _operational_summary(measurements: List[Dict[str, object]]) -> List[Dict[str
         )
         phase = str(row.get("phase", ""))
         if phase == "train":
-            bucket["training_phase_status"] = "ok" if int(row.get("exit_code", 1) or 1) == 0 else "failed"
+            bucket["training_phase_status"] = "ok" if _exit_ok(row) else "failed"
             bucket["total_training_runtime_s"] = row.get("duration_s")
             bucket["run_time_per_epoch_s"] = row.get("run_time_per_epoch_s")
             bucket["run_time_per_episode_s"] = row.get("run_time_per_episode_s")
         elif phase == "test":
-            bucket["test_phase_status"] = "ok" if int(row.get("exit_code", 1) or 1) == 0 else "failed"
+            bucket["test_phase_status"] = "ok" if _exit_ok(row) else "failed"
             bucket["test_runtime_s"] = row.get("duration_s")
             bucket["per_protein_latency_ms"] = row.get("per_protein_latency_ms")
         elif phase == "full":
-            bucket["full_phase_status"] = "ok" if int(row.get("exit_code", 1) or 1) == 0 else "failed"
+            bucket["full_phase_status"] = "ok" if _exit_ok(row) else "failed"
             bucket["full_runtime_s"] = row.get("duration_s")
 
         gpu_probe = row.get("gpu_probe") or []
@@ -228,6 +279,8 @@ def _operational_summary(measurements: List[Dict[str, object]]) -> List[Dict[str
             if isinstance(first, dict):
                 bucket["gpu_model"] = first.get("name", "")
         bucket["node_name"] = row.get("hostname", bucket["node_name"])
+        if not bucket["gpu_model"] and bucket["node_name"]:
+            bucket["gpu_model"] = _pbs_gpu_model_for_host(str(bucket["node_name"]))
         bucket["container_image"] = row.get("container_image", bucket["container_image"])
 
         mem_value = row.get("memory_usage_gib")
@@ -405,7 +458,7 @@ def _render_report(
     flops_rows: List[Dict[str, object]],
 ) -> str:
     lines: List[str] = []
-    lines.append("# EC-Bench Hopper H100 Runtime Benchmark Report")
+    lines.append("# EC-Bench Hopper GPU Runtime Benchmark Report")
     lines.append("")
     lines.append("## Hardware and execution context")
     lines.append(f"- Generated: {datetime.now(timezone.utc).isoformat()}")
@@ -453,6 +506,20 @@ def _render_report(
             )
     else:
         lines.append("- No measured runtime JSON files were found under the scratch measurement directory yet.")
+    lines.append("")
+    lines.append("## Measurement gaps")
+    gaps = []
+    if not gpu_probe:
+        gaps.append("hardware preflight did not capture in-container gpu_probe rows; GPU model is currently inferred from PBS host context instead")
+    if any(not row.get("gpu_model") for row in operational_rows):
+        gaps.append("operational summary rows are missing explicit gpu_model strings even when GPU memory was sampled")
+    if any(str(row.get("flops_status", "")).startswith("approx") for row in flops_rows):
+        gaps.append("ProtoEC FLOPs are approximate head-only estimates and exclude frozen backbone embedding cost")
+    if gaps:
+        for item in gaps:
+            lines.append(f"- {item}")
+    else:
+        lines.append("- No major measurement gaps were detected in this pass.")
     lines.append("")
     lines.append("## Parameter and storage efficiency")
     for row in params_rows:
@@ -515,7 +582,7 @@ def main() -> None:
     ensure_dir(scratch_root)
 
     manifest_rows = _load_manifest((args.ecbench_root / args.manifest).resolve() if not args.manifest.is_absolute() else args.manifest)
-    hardware_manifest = collect_preflight()
+    hardware_manifest = _resolve_hardware_manifest(scratch_root)
     hardware_manifest["container_image"] = hardware_manifest.get("container_image") or os.environ.get("BENCHMARK_CONTAINER_IMAGE", "")
     data_manifest = _resolve_data_manifest(args.ecbench_root.resolve(), args.data_prep_manifest)
 
@@ -570,6 +637,7 @@ def main() -> None:
             "protocol",
             "training_phase_status",
             "test_phase_status",
+            "full_phase_status",
             "memory_usage_gib",
             "memory_kind",
             "run_time_per_epoch_s",
