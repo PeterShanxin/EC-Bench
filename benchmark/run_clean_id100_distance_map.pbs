@@ -1,0 +1,98 @@
+#!/bin/bash
+#
+# Hopper GPU full distance-map precompute for CLEAN ID100.
+#
+
+#PBS -N clean_id100_distmap
+#PBS -q auto
+#PBS -P CFP03-SF-097
+#PBS -l select=1:ngpus=1:ncpus=12:mem=225GB
+#PBS -l walltime=24:00:00
+#PBS -j oe
+#PBS -o /home/svu/e0969321/clean_id100_distmap.log
+#PBS -V
+
+set -euo pipefail
+
+cd "$PBS_O_WORKDIR"
+
+source /app1/ebapps/ebenv_hopper.sh
+module purge || true
+module load singularity
+
+IMAGE="${SINGULARITY_IMAGE:-/app1/common/singularity-img/hopper/pytorch/pytorch_2.3.0_cuda_12.4_ngc_24.04.sif}"
+SCRATCH_ROOT="${SCRATCH_ROOT:-/scratch/e0969321/ecbench_clean_id100_retrain_20260324}"
+PREPARED_ECBENCH_ROOT="${PREPARED_ECBENCH_ROOT:-/scratch/e0969321/ecbench_hopper_h100_task1_runtime_20260313/data_prep/ecbench_worktree}"
+TORCH_CACHE_ROOT="${TORCH_CACHE_ROOT:-/scratch/e0969321/ecbench_clean_id100_runtime_20260323/torch_cache}"
+PYUSERBASE="${SCRATCH_ROOT}/pyuserbase"
+EXPECTED_GPU_MODEL="${EXPECTED_GPU_MODEL:-H200}"
+HOST_NODE="$(hostname -s)"
+PBSNODES_BIN="${PBS_EXEC:-/cm/shared/apps/pbspro/current}/bin/pbsnodes"
+if [ ! -x "${PBSNODES_BIN}" ]; then
+  PBSNODES_BIN="$(command -v pbsnodes || true)"
+fi
+GPU_MODEL_HINT=""
+if [ -n "${PBSNODES_BIN}" ] && [ -x "${PBSNODES_BIN}" ]; then
+  GPU_MODEL_HINT="$("${PBSNODES_BIN}" -av 2>/dev/null | awk 'BEGIN{show=0} /^'"${HOST_NODE}"'(\\.cm\\.cluster)?[[:space:]]*$/{show=1; next} /^$/{if(show){exit}} show && /resources_available.gpu_model =/{print $NF; exit}' || true)"
+fi
+
+mkdir -p "${SCRATCH_ROOT}" "${PYUSERBASE}" "${SCRATCH_ROOT}/logs" "${SCRATCH_ROOT}/measurements" "${SCRATCH_ROOT}/clean/distance_map"
+mkdir -p "${SCRATCH_ROOT}/cache" "${TORCH_CACHE_ROOT}"
+
+export OMP_NUM_THREADS="${PBS_NCPUS:-${NCPUS:-12}}"
+export MKL_NUM_THREADS="${OMP_NUM_THREADS}"
+export OPENBLAS_NUM_THREADS="${OMP_NUM_THREADS}"
+export NUMEXPR_NUM_THREADS="${OMP_NUM_THREADS}"
+
+singularity exec -e --nv "${IMAGE}" bash --noprofile --norc -c "
+  set -euo pipefail
+  export PYTHONUSERBASE='${PYUSERBASE}'
+  export PATH='${PYUSERBASE}/bin:'\"\$PATH\"
+  export XDG_CACHE_HOME='${SCRATCH_ROOT}/cache'
+  export TORCH_HOME='${TORCH_CACHE_ROOT}'
+  python3 -m pip install --user --upgrade pip
+  python3 -m pip install --user \
+    'fair-esm>=2.0.0,<3.0.0' \
+    'biopython>=1.83,<2.0' \
+    'mpld3>=0.5.12,<0.6' \
+    'pandarallel>=1.6,<2.0' \
+    'pyahocorasick>=2.1,<3.0'
+"
+
+singularity exec -e --nv "${IMAGE}" bash --noprofile --norc -c "
+  set -euo pipefail
+  export PYTHONUSERBASE='${PYUSERBASE}'
+  export PATH='${PYUSERBASE}/bin:'\"\$PATH\"
+  export XDG_CACHE_HOME='${SCRATCH_ROOT}/cache'
+  export TORCH_HOME='${TORCH_CACHE_ROOT}'
+  export PYTHONPATH='/home/svu/e0969321/EC-Bench'
+  export BENCHMARK_NODE_NAME='${HOST_NODE}'
+  export BENCHMARK_GPU_MODEL_HINT='${GPU_MODEL_HINT}'
+  export BENCHMARK_CONTAINER_IMAGE='${IMAGE}'
+  export PBS_JOBID='${PBS_JOBID:-}'
+  export PBS_QUEUE='${PBS_QUEUE:-}'
+  export PBS_NCPUS='${PBS_NCPUS:-${NCPUS:-12}}'
+
+  python3 /home/svu/e0969321/EC-Bench/benchmark/validate_gpu_runtime.py \
+    --out '${SCRATCH_ROOT}/clean/hardware_preflight_distance_map.json' \
+    --require-cuda \
+    --require-gpu-model '${EXPECTED_GPU_MODEL}'
+
+  python3 -m benchmark.measure_command \
+    --model-id clean \
+    --phase setup \
+    --protocol distance_map_full \
+    --cwd '${PREPARED_ECBENCH_ROOT}' \
+    --json-out '${SCRATCH_ROOT}/measurements/clean_id100_distance_map_full.json' \
+    --log-file '${SCRATCH_ROOT}/logs/clean_id100_distance_map_full.log' \
+    -- \
+    python3 /home/svu/e0969321/EC-Bench/benchmark/clean_compute_distance_map.py \
+      --ecbench-root '${PREPARED_ECBENCH_ROOT}' \
+      --training-data train_ec_100 \
+      --embedding-dir '${PREPARED_ECBENCH_ROOT}/CLEAN/data/esm_data' \
+      --distance-map-out '${SCRATCH_ROOT}/clean/distance_map/train_ec_100.pkl' \
+      --esm-matrix-out '${SCRATCH_ROOT}/clean/distance_map/train_ec_100_esm.pkl' \
+      --manifest-out '${SCRATCH_ROOT}/clean/distance_map/train_ec_100_manifest.json' \
+      --resume \
+      --require-cuda
+"

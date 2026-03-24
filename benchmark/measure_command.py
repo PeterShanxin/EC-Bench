@@ -124,6 +124,14 @@ def _sample_gpu_mem_gib(root_pid: int) -> float:
     return total_mib / 1024.0
 
 
+def _container_image() -> str:
+    for key in ("BENCHMARK_CONTAINER_IMAGE", "APPTAINER_CONTAINER", "SINGULARITY_CONTAINER"):
+        value = os.environ.get(key, "").strip()
+        if value:
+            return value
+    return ""
+
+
 def _env_from_assignments(items: Sequence[str]) -> Dict[str, str]:
     env = os.environ.copy()
     for item in items:
@@ -251,12 +259,14 @@ def main() -> None:
         "train_flops_per_epoch_or_episode": train_flops_per_epoch_or_episode,
         "test_runtime_s": duration_s if args.phase == "test" else None,
         "total_training_runtime_s": duration_s if args.phase == "train" else None,
-        "container_image": os.environ.get("BENCHMARK_CONTAINER_IMAGE", ""),
+        "container_image": _container_image(),
         "pbs_jobid": os.environ.get("PBS_JOBID", ""),
         "pbs_queue": os.environ.get("PBS_QUEUE", ""),
         "gpu_model_hint": gpu_model_hint,
     }
     write_json(args.json_out, payload)
+    if exit_code != 0:
+        raise SystemExit(exit_code)
 
 
 if __name__ == "__main__":

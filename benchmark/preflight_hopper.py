@@ -56,6 +56,14 @@ def _parse_gpu_probe() -> List[Dict[str, str]]:
     return rows
 
 
+def _container_image() -> str:
+    for key in ("BENCHMARK_CONTAINER_IMAGE", "APPTAINER_CONTAINER", "SINGULARITY_CONTAINER"):
+        value = os.environ.get(key, "").strip()
+        if value:
+            return value
+    return ""
+
+
 def _cluster_gpu_summary() -> Dict[str, int]:
     probe = _run(["pbsnodes", "-av"])
     summary = {
@@ -105,7 +113,7 @@ def collect_preflight() -> Dict[str, object]:
         "pbs_queue": os.environ.get("PBS_QUEUE", ""),
         "pbs_ncpus": os.environ.get("PBS_NCPUS", ""),
         "project_hint": "CFP03-SF-097",
-        "container_image": os.environ.get("BENCHMARK_CONTAINER_IMAGE", ""),
+        "container_image": _container_image(),
         "singularity_path": shutil.which("singularity") or "",
         "qsub_path": shutil.which("qsub") or "",
         "python_path": shutil.which("python3") or shutil.which("python") or "",
