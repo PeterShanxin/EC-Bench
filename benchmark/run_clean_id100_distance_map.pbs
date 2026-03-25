@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Hopper GPU full distance-map precompute for CLEAN ID100.
+# Hopper GPU full distance-map precompute for CLEAN retraining.
 #
 
 #PBS -N clean_id100_distmap
@@ -26,6 +26,8 @@ PREPARED_ECBENCH_ROOT="${PREPARED_ECBENCH_ROOT:-/scratch/e0969321/ecbench_hopper
 TORCH_CACHE_ROOT="${TORCH_CACHE_ROOT:-/scratch/e0969321/ecbench_clean_id100_runtime_20260323/torch_cache}"
 PYUSERBASE="${SCRATCH_ROOT}/pyuserbase"
 EXPECTED_GPU_MODEL="${EXPECTED_GPU_MODEL:-H200}"
+TRAINING_DATA="${TRAINING_DATA:-train_ec_100}"
+MEASUREMENT_BASENAME="${MEASUREMENT_BASENAME:-clean_distance_map_${TRAINING_DATA}}"
 HOST_NODE="$(hostname -s)"
 PBSNODES_BIN="${PBS_EXEC:-/cm/shared/apps/pbspro/current}/bin/pbsnodes"
 if [ ! -x "${PBSNODES_BIN}" ]; then
@@ -74,25 +76,25 @@ singularity exec -e --nv "${IMAGE}" bash --noprofile --norc -c "
   export PBS_NCPUS='${PBS_NCPUS:-${NCPUS:-12}}'
 
   python3 /home/svu/e0969321/EC-Bench/benchmark/validate_gpu_runtime.py \
-    --out '${SCRATCH_ROOT}/clean/hardware_preflight_distance_map.json' \
+    --out '${SCRATCH_ROOT}/clean/hardware_preflight_${MEASUREMENT_BASENAME}.json' \
     --require-cuda \
     --require-gpu-model '${EXPECTED_GPU_MODEL}'
 
   python3 -m benchmark.measure_command \
     --model-id clean \
     --phase setup \
-    --protocol distance_map_full \
+    --protocol ${MEASUREMENT_BASENAME} \
     --cwd '${PREPARED_ECBENCH_ROOT}' \
-    --json-out '${SCRATCH_ROOT}/measurements/clean_id100_distance_map_full.json' \
-    --log-file '${SCRATCH_ROOT}/logs/clean_id100_distance_map_full.log' \
+    --json-out '${SCRATCH_ROOT}/measurements/${MEASUREMENT_BASENAME}.json' \
+    --log-file '${SCRATCH_ROOT}/logs/${MEASUREMENT_BASENAME}.log' \
     -- \
     python3 /home/svu/e0969321/EC-Bench/benchmark/clean_compute_distance_map.py \
       --ecbench-root '${PREPARED_ECBENCH_ROOT}' \
-      --training-data train_ec_100 \
+      --training-data '${TRAINING_DATA}' \
       --embedding-dir '${PREPARED_ECBENCH_ROOT}/CLEAN/data/esm_data' \
-      --distance-map-out '${SCRATCH_ROOT}/clean/distance_map/train_ec_100.pkl' \
-      --esm-matrix-out '${SCRATCH_ROOT}/clean/distance_map/train_ec_100_esm.pkl' \
-      --manifest-out '${SCRATCH_ROOT}/clean/distance_map/train_ec_100_manifest.json' \
+      --distance-map-out '${SCRATCH_ROOT}/clean/distance_map/${TRAINING_DATA}.pkl' \
+      --esm-matrix-out '${SCRATCH_ROOT}/clean/distance_map/${TRAINING_DATA}_esm.pkl' \
+      --manifest-out '${SCRATCH_ROOT}/clean/distance_map/${TRAINING_DATA}_manifest.json' \
       --resume \
       --require-cuda
 "

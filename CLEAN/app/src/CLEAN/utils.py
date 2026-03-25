@@ -3,6 +3,7 @@ import random
 import os
 import math
 from re import L
+from functools import lru_cache
 import torch
 import numpy as np
 import subprocess
@@ -59,11 +60,50 @@ def format_esm(a):
     return a
 
 
+def _env_int(name, default):
+    raw = os.environ.get(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+_ESM_PRIMARY_DIR = os.environ.get('CLEAN_ESM_DIR', 'CLEAN/data/esm_data')
+_ESM_FALLBACK_DIR = os.environ.get('CLEAN_ESM_FALLBACK_DIR', 'PenLight/esm_embeddings')
+_ESM_CACHE_SIZE = max(0, _env_int('CLEAN_ESM_CACHE_SIZE', 0))
+
+
+@lru_cache(maxsize=None)
+def _resolve_esm_path(lookup):
+    primary = os.path.join(_ESM_PRIMARY_DIR, lookup + '.pt')
+    if os.path.exists(primary):
+        return primary
+    return os.path.join(_ESM_FALLBACK_DIR, lookup + '.pt')
+
+
+def _load_esm_embedding_uncached(lookup):
+    return format_esm(torch.load(_resolve_esm_path(lookup), map_location='cpu'))
+
+
+if _ESM_CACHE_SIZE > 0:
+    # Callers treat cached tensors as read-only; this avoids reloading the same
+    # small embedding files thousands of times across epochs.
+    @lru_cache(maxsize=_ESM_CACHE_SIZE)
+    def _load_esm_embedding_cached(lookup):
+        return _load_esm_embedding_uncached(lookup)
+else:
+    def _load_esm_embedding_cached(lookup):
+        return _load_esm_embedding_uncached(lookup)
+
+
+def load_esm_embedding(lookup):
+    return _load_esm_embedding_cached(lookup)
+
+
 def load_esm(lookup):
-    #if not find in esm_data, search in ../PenLight/esm_embeddings
-    esm = format_esm(torch.load('CLEAN/data/esm_data/' + lookup + '.pt')) if os.path.exists(
-        'CLEAN/data/esm_data/' + lookup + '.pt') else format_esm(torch.load('PenLight/esm_embeddings/' + lookup + '.pt'))
-    return esm.unsqueeze(0)
+    return load_esm_embedding(lookup).unsqueeze(0)
 
 
 def esm_embedding(ec_id_dict, device, dtype):
@@ -190,5 +230,4 @@ def mutate_single_seq_ECs(train_file):
     mask_sequences(single_id, train_file, train_file+'_single_seq_ECs')
     fasta_name = train_file+'_single_seq_ECs'
     return fasta_name
-
 

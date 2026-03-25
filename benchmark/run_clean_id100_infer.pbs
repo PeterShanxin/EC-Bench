@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# Hopper GPU CLEAN max-separation inference wrapper for EC-Bench ID100.
+# Hopper GPU CLEAN max-separation inference wrapper for configurable EC-Bench split.
 #
 
 #PBS -N clean_id100_infer
@@ -27,6 +27,8 @@ TORCH_CACHE_ROOT="${TORCH_CACHE_ROOT:-/scratch/e0969321/ecbench_clean_id100_runt
 PYUSERBASE="${SCRATCH_ROOT}/pyuserbase"
 EXPECTED_GPU_MODEL="${EXPECTED_GPU_MODEL:-H200}"
 MODEL_NAME="${MODEL_NAME:-train_ec_100_supconH_full}"
+TRAINING_DATA="${TRAINING_DATA:-train_ec_100}"
+TEST_DATA="${TEST_DATA:-test_ec_100}"
 MEASUREMENT_BASENAME="${MEASUREMENT_BASENAME:-clean_id100_infer_full}"
 HOST_NODE="$(hostname -s)"
 PBSNODES_BIN="${PBS_EXEC:-/cm/shared/apps/pbspro/current}/bin/pbsnodes"
@@ -46,7 +48,7 @@ export MKL_NUM_THREADS="${OMP_NUM_THREADS}"
 export OPENBLAS_NUM_THREADS="${OMP_NUM_THREADS}"
 export NUMEXPR_NUM_THREADS="${OMP_NUM_THREADS}"
 
-TEST_FASTA="${PREPARED_ECBENCH_ROOT}/CLEAN/data/test_ec_100.fasta"
+TEST_FASTA="${PREPARED_ECBENCH_ROOT}/CLEAN/data/${TEST_DATA}.fasta"
 TEST_QUERY_COUNT="$(grep -c '^>' "${TEST_FASTA}")"
 
 singularity exec -e --nv "${IMAGE}" bash --noprofile --norc -c "
@@ -109,12 +111,12 @@ singularity exec -e --nv "${IMAGE}" bash --noprofile --norc -c "
     -- \
     python3 /home/svu/e0969321/EC-Bench/benchmark/clean_infer_maxsep.py \
       --ecbench-root '${PREPARED_ECBENCH_ROOT}' \
-      --train-data train_ec_100 \
-      --test-data test_ec_100 \
+      --train-data '${TRAINING_DATA}' \
+      --test-data '${TEST_DATA}' \
       --embedding-dir '${PREPARED_ECBENCH_ROOT}/CLEAN/data/esm_data' \
-      --esm-matrix-path '${SCRATCH_ROOT}/clean/distance_map/train_ec_100_esm.pkl' \
+      --esm-matrix-path '${SCRATCH_ROOT}/clean/distance_map/${TRAINING_DATA}_esm.pkl' \
       --checkpoint-path '${SCRATCH_ROOT}/clean/model/${MODEL_NAME}.pth' \
-      --predictions-prefix '${SCRATCH_ROOT}/clean/results/test_ec_100' \
+      --predictions-prefix '${SCRATCH_ROOT}/clean/results/${TEST_DATA}' \
       --metrics-out '${SCRATCH_ROOT}/clean/results/${MEASUREMENT_BASENAME}_metrics.json' \
       --manifest-out '${SCRATCH_ROOT}/clean/results/${MEASUREMENT_BASENAME}_manifest.json' \
       --resume \

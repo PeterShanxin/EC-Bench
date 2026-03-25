@@ -1,7 +1,6 @@
 import torch
 import random
-from .utils import format_esm
-import os
+from .utils import load_esm, load_esm_embedding
 
 def mine_hard_negative(dist_map, knn=10):
     #print("The number of unique EC numbers: ", len(dist_map.keys()))
@@ -72,10 +71,7 @@ class Triplet_dataset_with_mine_EC(torch.utils.data.Dataset):
         anchor = random.choice(self.ec_id[anchor_ec])
         pos = random_positive(anchor, self.id_ec, self.ec_id)
         neg = mine_negative(anchor, self.id_ec, self.ec_id, self.mine_neg)
-        a = torch.load('CLEAN/data/esm_data/' + anchor + '.pt')
-        p = torch.load('CLEAN/data/esm_data/' + pos + '.pt') 
-        n = torch.load('CLEAN/data/esm_data/' + neg + '.pt')
-        return format_esm(a), format_esm(p), format_esm(n)
+        return load_esm_embedding(anchor), load_esm_embedding(pos), load_esm_embedding(neg)
 
 
 class MultiPosNeg_dataset_with_mine_EC(torch.utils.data.Dataset):
@@ -97,20 +93,11 @@ class MultiPosNeg_dataset_with_mine_EC(torch.utils.data.Dataset):
     def __getitem__(self, index):
         anchor_ec = self.full_list[index]
         anchor = random.choice(self.ec_id[anchor_ec])
-        a = format_esm(torch.load('CLEAN/data/esm_data/' +
-                       anchor + '.pt')).unsqueeze(0) if os.path.exists('CLEAN/data/esm_data/' + anchor + '.pt') \
-        else format_esm(torch.load('PenLight/esm_embeddings/' + anchor + '.pt')).unsqueeze(0)
-        data = [a]
+        data = [load_esm(anchor)]
         for _ in range(self.n_pos):
             pos = random_positive(anchor, self.id_ec, self.ec_id)
-            p = format_esm(torch.load('CLEAN/data/esm_data/' +
-                           pos + '.pt')).unsqueeze(0) if os.path.exists('CLEAN/data/esm_data/' + pos + '.pt') \
-            else format_esm(torch.load('PenLight/esm_embeddings/' + pos + '.pt')).unsqueeze(0) 
-            data.append(p)
+            data.append(load_esm(pos))
         for _ in range(self.n_neg):
             neg = mine_negative(anchor, self.id_ec, self.ec_id, self.mine_neg)
-            n = format_esm(torch.load('CLEAN/data/esm_data/' +
-                           neg + '.pt')).unsqueeze(0) if os.path.exists('CLEAN/data/esm_data/' + neg + '.pt') \
-            else format_esm(torch.load('PenLight/esm_embeddings/' + neg + '.pt')).unsqueeze(0)
-            data.append(n)
+            data.append(load_esm(neg))
         return torch.cat(data)
