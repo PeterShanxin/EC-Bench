@@ -11,6 +11,7 @@ PROTOEC_CONFIG="${PROTOEC_CONFIG:-configs/config.ecbench.yaml}"
 PROTOEC_THRESHOLDS="${PROTOEC_THRESHOLDS:-100}"
 BENCHMARK_CONTAINER_IMAGE="${BENCHMARK_CONTAINER_IMAGE:-}"
 BENCHMARK_REQUIRE_H100="${BENCHMARK_REQUIRE_H100:-0}"
+BENCHMARK_REQUIRE_GPU_MODEL="${BENCHMARK_REQUIRE_GPU_MODEL:-}"
 
 if [ ! -d "${PREPARED_ECBENCH_ROOT}" ]; then
   echo "[launch_protoec_runtime][error] prepared EC-Bench root not found: ${PREPARED_ECBENCH_ROOT}" >&2
@@ -32,6 +33,9 @@ mkdir -p "${MEASUREMENTS_DIR}" "${LOGS_DIR}"
 PRECHECK_ARGS=(--out "${SCRATCH_ROOT}/hardware_preflight.json")
 if [ "${BENCHMARK_REQUIRE_H100}" = "1" ]; then
   PRECHECK_ARGS+=(--require-h100)
+fi
+if [ -n "${BENCHMARK_REQUIRE_GPU_MODEL}" ]; then
+  PRECHECK_ARGS+=(--require-gpu-model "${BENCHMARK_REQUIRE_GPU_MODEL}")
 fi
 python -m benchmark.preflight_hopper "${PRECHECK_ARGS[@]}"
 
@@ -102,9 +106,28 @@ python -m benchmark.measure_command \
 
 bash "${ECBENCH_ROOT}/ProtoEC/run_model.sh" manifest
 
-python -m benchmark.run_benchmark \
-  --ecbench-root "${PREPARED_ECBENCH_ROOT}" \
-  --scratch-root "${SCRATCH_ROOT}" \
-  --out-root "${OUT_ROOT}" \
-  --protoec-manifest "${SCRATCH_ROOT}/protoec/adapter_manifest.json" \
+RUN_BENCHMARK_ARGS=(
+  --ecbench-root "${PREPARED_ECBENCH_ROOT}"
+  --scratch-root "${SCRATCH_ROOT}"
+  --out-root "${OUT_ROOT}"
+  --protoec-manifest "${SCRATCH_ROOT}/protoec/adapter_manifest.json"
   --data-prep-manifest "${DATA_PREP_MANIFEST}"
+)
+
+if [ -n "${CLEAN_BUNDLE_ROOT:-}" ]; then
+  RUN_BENCHMARK_ARGS+=(--clean-bundle-root "${CLEAN_BUNDLE_ROOT}")
+fi
+
+if [ -n "${BENCHMARK_EXTRA_MEASUREMENT_DIRS:-}" ]; then
+  OLD_IFS="${IFS}"
+  IFS=:
+  read -r -a EXTRA_MEASUREMENT_DIRS <<< "${BENCHMARK_EXTRA_MEASUREMENT_DIRS}"
+  IFS="${OLD_IFS}"
+  for extra_dir in "${EXTRA_MEASUREMENT_DIRS[@]}"; do
+    if [ -n "${extra_dir}" ]; then
+      RUN_BENCHMARK_ARGS+=(--measurement-dir "${extra_dir}")
+    fi
+  done
+fi
+
+python -m benchmark.run_benchmark "${RUN_BENCHMARK_ARGS[@]}"

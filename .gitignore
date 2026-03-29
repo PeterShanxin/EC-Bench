@@ -18,3 +18,8 @@
 __pycache__/
 **/__pycache__/
 *.py[cod]
+
+# Local profiler/debug outputs
+*.trace.json
+*.prof
+*.nvvp

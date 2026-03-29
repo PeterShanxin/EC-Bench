@@ -1,0 +1,91 @@
+#!/bin/bash
+#
+# Hopper GPU ProtoEC executed-set runtime wrapper for the matched ID30/H200 pass.
+#
+
+#PBS -N protoec_id30_h200
+#PBS -q auto
+#PBS -P CFP03-SF-097
+#PBS -l select=1:ngpus=1:ncpus=12:mem=225GB:gpu_model=H200
+#PBS -l walltime=24:00:00
+#PBS -j oe
+#PBS -o /home/svu/e0969321/protoec_id30_h200.log
+#PBS -V
+
+set -euo pipefail
+
+cd "$PBS_O_WORKDIR"
+
+source /app1/ebapps/ebenv_hopper.sh
+module purge || true
+module load singularity
+
+IMAGE="${SINGULARITY_IMAGE:-/app1/common/singularity-img/hopper/pytorch/pytorch_2.3.0_cuda_12.4_ngc_24.04.sif}"
+SCRATCH_ROOT="${SCRATCH_ROOT:-/scratch/e0969321/ecbench_hopper_h100_task1_runtime_20260313}"
+OUT_ROOT="${OUT_ROOT:-/home/svu/e0969321/FYP-fewshotlearn/results/ecbench_hopper_h100_task1_runtime_20260313}"
+PYUSERBASE="${SCRATCH_ROOT}/pyuserbase"
+PREPARED_ECBENCH_ROOT="${PREPARED_ECBENCH_ROOT:-/scratch/e0969321/ecbench_hopper_h100_task1_runtime_20260313/data_prep/ecbench_worktree}"
+DATA_PREP_MANIFEST="${DATA_PREP_MANIFEST:-/scratch/e0969321/ecbench_hopper_h100_task1_runtime_20260313/data_prep/data_prep_manifest.json}"
+PROTOEC_THRESHOLDS="${PROTOEC_THRESHOLDS:-30}"
+EXPECTED_GPU_MODEL="${EXPECTED_GPU_MODEL:-H200}"
+CLEAN_BUNDLE_ROOT="${CLEAN_BUNDLE_ROOT:-/home/svu/e0969321/EC-Bench/local_artifacts/clean_id30_retrained_20260329}"
+BENCHMARK_EXTRA_MEASUREMENT_DIRS="${BENCHMARK_EXTRA_MEASUREMENT_DIRS:-/scratch/e0969321/ecbench_clean_id30_retrain_20260325/measurements}"
+
+HOST_NODE="$(hostname -s)"
+PBSNODES_BIN="${PBS_EXEC:-/cm/shared/apps/pbspro/current}/bin/pbsnodes"
+if [ ! -x "${PBSNODES_BIN}" ]; then
+  PBSNODES_BIN="$(command -v pbsnodes || true)"
+fi
+GPU_MODEL_HINT=""
+if [ -n "${PBSNODES_BIN}" ] && [ -x "${PBSNODES_BIN}" ]; then
+  GPU_MODEL_HINT="$("${PBSNODES_BIN}" -av 2>/dev/null | awk 'BEGIN{show=0} /^'"${HOST_NODE}"'(\\.cm\\.cluster)?[[:space:]]*$/{show=1; next} /^$/{if(show){exit}} show && /resources_available.gpu_model =/{print $NF; exit}' || true)"
+fi
+
+export OMP_NUM_THREADS="${PBS_NCPUS:-12}"
+export MKL_NUM_THREADS="${OMP_NUM_THREADS}"
+export OPENBLAS_NUM_THREADS="${OMP_NUM_THREADS}"
+export NUMEXPR_NUM_THREADS="${OMP_NUM_THREADS}"
+
+mkdir -p "${PYUSERBASE}"
+mkdir -p "${SCRATCH_ROOT}/cache" "${SCRATCH_ROOT}/torch_cache"
+
+singularity exec -e --nv "${IMAGE}" bash --noprofile --norc -c "
+  set -euo pipefail
+  export PYTHONUSERBASE='${PYUSERBASE}'
+  export PATH='${PYUSERBASE}/bin:'\"\$PATH\"
+  export XDG_CACHE_HOME='${SCRATCH_ROOT}/cache'
+  export TORCH_HOME='${SCRATCH_ROOT}/torch_cache'
+  python3 -m pip install --user --upgrade pip
+  python3 -m pip install --user \
+    'fair-esm>=2.0.0,<3.0.0' \
+    'biopython>=1.83,<2.0' \
+    'mpld3>=0.5.12,<0.6' \
+    'pandarallel>=1.6,<2.0' \
+    'pyahocorasick>=2.1,<3.0'
+"
+
+singularity exec -e --nv "${IMAGE}" bash --noprofile --norc -c "
+  set -euo pipefail
+  export PYTHONUSERBASE='${PYUSERBASE}'
+  export PATH='${PYUSERBASE}/bin:'\"\$PATH\"
+  export XDG_CACHE_HOME='${SCRATCH_ROOT}/cache'
+  export TORCH_HOME='${SCRATCH_ROOT}/torch_cache'
+  export BENCHMARK_CONTAINER_IMAGE='${IMAGE}'
+  export BENCHMARK_NODE_NAME='${HOST_NODE}'
+  export BENCHMARK_GPU_MODEL_HINT='${GPU_MODEL_HINT}'
+  export BENCHMARK_REQUIRE_GPU_MODEL='${EXPECTED_GPU_MODEL}'
+  export BENCHMARK_EXTRA_MEASUREMENT_DIRS='${BENCHMARK_EXTRA_MEASUREMENT_DIRS}'
+  export CLEAN_BUNDLE_ROOT='${CLEAN_BUNDLE_ROOT}'
+  export SCRATCH_ROOT='${SCRATCH_ROOT}'
+  export OUT_ROOT='${OUT_ROOT}'
+  export ECBENCH_ROOT='/home/svu/e0969321/EC-Bench'
+  export PREPARED_ECBENCH_ROOT='${PREPARED_ECBENCH_ROOT}'
+  export DATA_PREP_MANIFEST='${DATA_PREP_MANIFEST}'
+  export FYP_ROOT='/home/svu/e0969321/FYP-fewshotlearn'
+  export PROTOEC_THRESHOLDS='${PROTOEC_THRESHOLDS}'
+  export PBS_JOBID='${PBS_JOBID:-}'
+  export PBS_QUEUE='${PBS_QUEUE:-}'
+  export PBS_NCPUS='${PBS_NCPUS:-12}'
+  cd '/home/svu/e0969321/EC-Bench'
+  bash benchmark/launch_protoec_runtime.sh
+"

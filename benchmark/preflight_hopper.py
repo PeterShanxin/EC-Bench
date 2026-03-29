@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import platform
+import re
 import shutil
 import socket
 import subprocess
@@ -125,6 +126,24 @@ def collect_preflight() -> Dict[str, object]:
     return payload
 
 
+def gpu_model_matches(required_gpu_model: str, gpu_rows: List[Dict[str, str]]) -> bool:
+    required = str(required_gpu_model or "").strip().upper()
+    if not required:
+        return True
+    for row in gpu_rows:
+        if not isinstance(row, dict):
+            continue
+        name = str(row.get("name", "") or "").upper()
+        if not name:
+            continue
+        if required in name:
+            return True
+        compact = re.sub(r"[^A-Z0-9]+", "", name)
+        if required in compact:
+            return True
+    return False
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Collect Hopper preflight metadata for the EC-Bench runtime pass.")
     ap.add_argument("--out", type=Path, default=None, help="Optional JSON output path.")
@@ -132,6 +151,11 @@ def main() -> None:
         "--require-h100",
         action="store_true",
         help="Exit non-zero if the current node has visible GPUs and none of them are H100s.",
+    )
+    ap.add_argument(
+        "--require-gpu-model",
+        default="",
+        help="Exit non-zero if the current node has visible GPUs and none of them match the requested model string.",
     )
     args = ap.parse_args()
 
@@ -143,9 +167,11 @@ def main() -> None:
     print(rendered)
 
     gpu_rows = payload.get("gpu_probe") or []
-    if args.require_h100 and gpu_rows:
-        ok = any("H100" in str(row.get("name", "")).upper() for row in gpu_rows if isinstance(row, dict))
-        if not ok:
+    required_gpu_model = str(args.require_gpu_model or "").strip()
+    if args.require_h100 and not required_gpu_model:
+        required_gpu_model = "H100"
+    if required_gpu_model and gpu_rows:
+        if not gpu_model_matches(required_gpu_model, [row for row in gpu_rows if isinstance(row, dict)]):
             raise SystemExit(2)
 
 

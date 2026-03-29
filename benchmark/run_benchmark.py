@@ -4,10 +4,11 @@ import argparse
 import csv
 import json
 import os
+import re
 import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 from benchmark._common import (
     BASE_MODEL_COLUMN_MAP,
@@ -188,6 +189,12 @@ def _task1_rows_from_protoec(protoec_manifest_path: Path) -> List[Dict[str, obje
         pred_path = Path(str(obj.get("predictions_csv", "")))
         if not pred_path.exists():
             continue
+        metrics_payload: Dict[str, object] = {}
+        metrics_path = Path(str(obj.get("metrics_json", "")))
+        if metrics_path.exists():
+            payload = read_json(metrics_path)
+            if isinstance(payload, dict):
+                metrics_payload = payload
         rows = read_csv_rows(pred_path)
         converted = []
         for row in rows:
@@ -198,6 +205,14 @@ def _task1_rows_from_protoec(protoec_manifest_path: Path) -> List[Dict[str, obje
                 }
             )
         metrics = task1_metrics_from_rows(converted, "protoec")
+        coverage = metrics.coverage
+        no_pred_rate = metrics.no_pred_rate
+        if metrics_payload:
+            try:
+                coverage = float(metrics_payload.get("coverage_ratio", coverage))
+            except (TypeError, ValueError):
+                coverage = metrics.coverage
+            no_pred_rate = 1.0 - coverage
         out.append(
             {
                 "threshold": int(threshold_raw),
@@ -212,25 +227,123 @@ def _task1_rows_from_protoec(protoec_manifest_path: Path) -> List[Dict[str, obje
                 "weighted_precision": metrics.weighted_precision,
                 "weighted_recall": metrics.weighted_recall,
                 "weighted_f1": metrics.weighted_f1,
-                "coverage": metrics.coverage,
-                "no_pred_rate": metrics.no_pred_rate,
-                "variant_note": obj.get("protocol_note", ""),
+                "coverage": coverage,
+                "no_pred_rate": no_pred_rate,
+                "variant_note": (
+                    obj.get("protocol_note", "")
+                    + (" Coverage is taken from ProtoEC global_metrics.json because the prediction CSV only contains the evaluated subset." if metrics_payload else "")
+                ).strip(),
             }
         )
     return out
 
 
-def _load_measurements(measurements_root: Path) -> List[Dict[str, object]]:
+def _load_measurements(measurement_roots: Sequence[Path]) -> List[Dict[str, object]]:
     out: List[Dict[str, object]] = []
-    if not measurements_root.exists():
-        return out
-    for path in sorted(measurements_root.glob("*.json")):
-        payload = read_json(path)
-        if isinstance(payload, dict):
-            payload = dict(payload)
-            payload["measurement_path"] = str(path)
-            out.append(payload)
+    seen: set[str] = set()
+    for measurements_root in measurement_roots:
+        if not measurements_root.exists():
+            continue
+        for path in sorted(measurements_root.glob("*.json")):
+            payload = read_json(path)
+            if isinstance(payload, dict):
+                payload = dict(payload)
+                payload["measurement_path"] = str(path)
+                key = str(path.resolve())
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(payload)
     return out
+
+
+def _first_existing(root: Path, patterns: Sequence[str]) -> Optional[Path]:
+    for pattern in patterns:
+        matches = sorted(root.glob(pattern))
+        if matches:
+            return matches[0]
+    return None
+
+
+def _threshold_from_text(*values: object) -> Optional[int]:
+    for value in values:
+        text = str(value or "")
+        if not text:
+            continue
+        match = re.search(r"(?:train|test)_ec_(\d+)", text)
+        if match:
+            return int(match.group(1))
+        match = re.search(r"\bid(\d+)\b", text.lower())
+        if match:
+            return int(match.group(1))
+    return None
+
+
+def _clean_head_params() -> Tuple[int, int]:
+    trainable = (
+        (1280 * 512) + 512
+        + (512 + 512)
+        + (512 * 512) + 512
+        + (512 + 512)
+        + (512 * 256) + 256
+    )
+    return trainable, 650_000_000 + trainable
+
+
+def _load_clean_bundle(clean_bundle_root: Optional[Path]) -> Dict[str, object]:
+    if clean_bundle_root is None:
+        return {}
+    root = clean_bundle_root.resolve()
+    if not root.exists():
+        return {}
+
+    train_manifest_path = _first_existing(root, ["train_ec_*_supconH*.manifest.json"])
+    infer_manifest_path = _first_existing(root, ["*infer*_manifest.json"])
+    infer_metrics_path = _first_existing(root, ["*infer*_metrics.json"])
+    predictions_path = _first_existing(root, ["*maxsep.csv"])
+    checkpoint_path = _first_existing(root, ["train_ec_*_supconH*.pth"])
+
+    train_manifest = read_json(train_manifest_path) if train_manifest_path and train_manifest_path.exists() else {}
+    infer_manifest = read_json(infer_manifest_path) if infer_manifest_path and infer_manifest_path.exists() else {}
+    infer_metrics = read_json(infer_metrics_path) if infer_metrics_path and infer_metrics_path.exists() else {}
+
+    if isinstance(infer_manifest, dict) and infer_manifest.get("predictions_csv"):
+        candidate = Path(str(infer_manifest["predictions_csv"]))
+        if predictions_path is None and candidate.exists():
+            predictions_path = candidate
+    if isinstance(infer_manifest, dict) and infer_manifest.get("checkpoint_path"):
+        candidate = Path(str(infer_manifest["checkpoint_path"]))
+        if checkpoint_path is None and candidate.exists():
+            checkpoint_path = candidate
+    if isinstance(train_manifest, dict) and train_manifest.get("final_model_out"):
+        candidate = Path(str(train_manifest["final_model_out"]))
+        if checkpoint_path is None and candidate.exists():
+            checkpoint_path = candidate
+
+    trainable_params, total_params = _clean_head_params()
+    split_threshold = _threshold_from_text(
+        train_manifest.get("training_data") if isinstance(train_manifest, dict) else "",
+        infer_manifest.get("train_data") if isinstance(infer_manifest, dict) else "",
+        infer_manifest.get("test_data") if isinstance(infer_manifest, dict) else "",
+        str(root),
+    )
+    return {
+        "bundle_root": str(root),
+        "train_manifest_path": str(train_manifest_path) if train_manifest_path else "",
+        "infer_manifest_path": str(infer_manifest_path) if infer_manifest_path else "",
+        "infer_metrics_path": str(infer_metrics_path) if infer_metrics_path else "",
+        "predictions_path": str(predictions_path) if predictions_path else "",
+        "checkpoint_path": str(checkpoint_path) if checkpoint_path else "",
+        "checkpoint_size_mib": path_size_mib(checkpoint_path) if checkpoint_path and checkpoint_path.exists() else "",
+        "split_threshold": split_threshold,
+        "train_manifest": train_manifest if isinstance(train_manifest, dict) else {},
+        "infer_manifest": infer_manifest if isinstance(infer_manifest, dict) else {},
+        "infer_metrics": infer_metrics if isinstance(infer_metrics, dict) else {},
+        "trainable_params": trainable_params,
+        "total_params": total_params,
+        "embedding_model": "esm1b_t33_650M_UR50S",
+        "params_status": "exact_head_plus_approx_backbone",
+    }
 
 
 def _resolve_optional_json(explicit_path: Path | None, candidates: Sequence[Path]) -> Dict[str, object]:
@@ -244,6 +357,11 @@ def _resolve_optional_json(explicit_path: Path | None, candidates: Sequence[Path
             if isinstance(payload, dict):
                 return dict(payload)
     return {}
+
+
+def _select_fields(rows: Sequence[Dict[str, object]], fieldnames: Sequence[str]) -> List[Dict[str, object]]:
+    keys = list(fieldnames)
+    return [{key: row.get(key, "") for key in keys} for row in rows]
 
 
 def _operational_summary(measurements: List[Dict[str, object]]) -> List[Dict[str, object]]:
@@ -313,20 +431,44 @@ def _operational_summary(measurements: List[Dict[str, object]]) -> List[Dict[str
     return sorted(grouped.values(), key=lambda item: (str(item["model_id"]), str(item["protocol"])))
 
 
-def _artifact_inventory(ecbench_root: Path, manifest_rows: List[Dict[str, object]], protoec_manifest_path: Path) -> List[Dict[str, object]]:
+def _artifact_inventory(
+    ecbench_root: Path,
+    manifest_rows: List[Dict[str, object]],
+    protoec_manifest_path: Path,
+    clean_bundle: Dict[str, object],
+) -> List[Dict[str, object]]:
+    def _quick_size(path: Path) -> object:
+        if path.is_file():
+            return path_size_mib(path)
+        return ""
+
+    def _inventory_paths(patterns: Sequence[str]) -> List[Path]:
+        resolved: List[Path] = []
+        for pattern in patterns:
+            if "**/*" in pattern:
+                prefix = pattern.split("**/*", 1)[0].rstrip("/")
+                if prefix:
+                    candidate = ecbench_root / prefix
+                    if candidate.exists():
+                        resolved.append(candidate)
+                    continue
+            resolved.extend(expand_existing_paths(ecbench_root, [pattern]))
+        deduped = sorted({str(path.resolve()) for path in resolved})
+        return [Path(item) for item in deduped]
+
     rows: List[Dict[str, object]] = []
     for item in manifest_rows:
         model_id = str(item["model_id"])
         patterns = item.get("runtime_artifact_globs") or []
         if not isinstance(patterns, list):
             patterns = []
-        for path in expand_existing_paths(ecbench_root, [str(p) for p in patterns]):
+        for path in _inventory_paths([str(p) for p in patterns]):
             rows.append(
                 {
                     "model_id": model_id,
                     "path": str(path),
                     "kind": "runtime_artifact",
-                    "size_mib": path_size_mib(path),
+                    "size_mib": _quick_size(path),
                 }
             )
 
@@ -347,7 +489,7 @@ def _artifact_inventory(ecbench_root: Path, manifest_rows: List[Dict[str, object
                                     "model_id": "protoec",
                                     "path": str(actual),
                                     "kind": "embedding_cache",
-                                    "size_mib": path_size_mib(actual),
+                                    "size_mib": _quick_size(actual),
                                 }
                             )
                 elif path.exists():
@@ -356,7 +498,7 @@ def _artifact_inventory(ecbench_root: Path, manifest_rows: List[Dict[str, object
                             "model_id": "protoec",
                             "path": str(path),
                             "kind": key,
-                            "size_mib": path_size_mib(path),
+                            "size_mib": _quick_size(path),
                         }
                     )
             thresholds = payload.get("thresholds") or {}
@@ -375,9 +517,30 @@ def _artifact_inventory(ecbench_root: Path, manifest_rows: List[Dict[str, object
                                     "model_id": "protoec",
                                     "path": str(path),
                                     "kind": key,
-                                    "size_mib": path_size_mib(path),
+                                    "size_mib": _quick_size(path),
                                 }
                             )
+    if clean_bundle:
+        for key in (
+            "train_manifest_path",
+            "infer_manifest_path",
+            "infer_metrics_path",
+            "predictions_path",
+            "checkpoint_path",
+        ):
+            value = clean_bundle.get(key)
+            if not value:
+                continue
+            path = Path(str(value))
+            if path.exists():
+                rows.append(
+                    {
+                        "model_id": "clean",
+                        "path": str(path),
+                        "kind": f"clean_bundle_{key}",
+                        "size_mib": _quick_size(path),
+                    }
+                )
     return rows
 
 
@@ -385,6 +548,7 @@ def _params_storage_summary(
     manifest_rows: List[Dict[str, object]],
     artifact_rows: List[Dict[str, object]],
     protoec_manifest_path: Path,
+    clean_bundle: Dict[str, object],
 ) -> List[Dict[str, object]]:
     size_by_model: Dict[str, float] = {}
     for row in artifact_rows:
@@ -429,6 +593,15 @@ def _params_storage_summary(
                     "params_status": "ok",
                 }
             )
+        elif model_id == "clean" and clean_bundle:
+            row.update(
+                {
+                    "trainable_params": clean_bundle.get("trainable_params", ""),
+                    "total_params": clean_bundle.get("total_params", ""),
+                    "checkpoint_size_mib": clean_bundle.get("checkpoint_size_mib", ""),
+                    "params_status": clean_bundle.get("params_status", "ok"),
+                }
+            )
         rows.append(row)
     return rows
 
@@ -439,6 +612,7 @@ def _flops_summary(
     *,
     protoec_profiler_payload: Dict[str, object],
     clean_profiler_payload: Dict[str, object],
+    clean_bundle: Dict[str, object],
 ) -> List[Dict[str, object]]:
     protoec_payload = read_json(protoec_manifest_path) if protoec_manifest_path.exists() else {}
     rows: List[Dict[str, object]] = []
@@ -483,8 +657,259 @@ def _flops_summary(
                     "flops_status": clean_profiler_payload.get("flops_status", "profiler_model_core"),
                 }
             )
+        elif model_id == "clean" and clean_bundle:
+            row["flops_status"] = "not_yet_profiled_model_core"
         rows.append(row)
     return rows
+
+
+def _latest_measurement(
+    measurements: List[Dict[str, object]],
+    *,
+    model_id: str,
+    phase: str,
+    protocol_contains: Sequence[str] = (),
+    pbs_jobids: Sequence[str] = (),
+) -> Dict[str, object]:
+    want_jobids = {str(item) for item in pbs_jobids if str(item)}
+    candidates: List[Dict[str, object]] = []
+    for row in measurements:
+        if str(row.get("model_id", "")) != model_id:
+            continue
+        if str(row.get("phase", "")) != phase:
+            continue
+        protocol = str(row.get("protocol", ""))
+        if protocol_contains and not all(chunk in protocol for chunk in protocol_contains):
+            continue
+        if want_jobids and str(row.get("pbs_jobid", "")) not in want_jobids:
+            continue
+        if not _exit_ok(row):
+            continue
+        candidates.append(row)
+    if not candidates:
+        return {}
+    candidates.sort(key=lambda item: (str(item.get("finished_utc", "")), str(item.get("started_utc", "")), str(item.get("measurement_path", ""))))
+    return candidates[-1]
+
+
+def _protoec_actual_task1_row(protoec_manifest_path: Path, threshold: int) -> Dict[str, object]:
+    for row in _task1_rows_from_protoec(protoec_manifest_path):
+        if int(row.get("threshold", -1)) == int(threshold):
+            return row
+    return {}
+
+
+def _clean_actual_task1_row(clean_bundle: Dict[str, object]) -> Dict[str, object]:
+    metrics = clean_bundle.get("infer_metrics")
+    if not isinstance(metrics, dict) or not metrics:
+        return {}
+    threshold = clean_bundle.get("split_threshold")
+    if threshold is None:
+        return {}
+    return {
+        "threshold": int(threshold),
+        "model_id": "clean",
+        "display_name": "CLEAN",
+        "source_type": "clean_retrained_bundle",
+        "source_path": str(clean_bundle.get("predictions_path", "") or clean_bundle.get("infer_metrics_path", "")),
+        "exact_top1": metrics.get("exact_top1", ""),
+        "micro_precision": metrics.get("micro_precision", ""),
+        "micro_recall": metrics.get("micro_recall", ""),
+        "micro_f1": metrics.get("micro_f1", ""),
+        "weighted_precision": metrics.get("weighted_precision", ""),
+        "weighted_recall": metrics.get("weighted_recall", ""),
+        "weighted_f1": metrics.get("weighted_f1", ""),
+        "coverage": metrics.get("coverage", ""),
+        "no_pred_rate": metrics.get("no_pred_rate", ""),
+        "variant_note": "Executed-split retrained ID30 checkpoint from the durable home bundle.",
+    }
+
+
+def _matched_protoec_clean_summary(
+    *,
+    ecbench_root: Path,
+    measurements: List[Dict[str, object]],
+    protoec_manifest_path: Path,
+    clean_bundle: Dict[str, object],
+) -> Dict[str, object]:
+    protoec_manifest = read_json(protoec_manifest_path) if protoec_manifest_path.exists() else {}
+    protoec_thresholds = protoec_manifest.get("thresholds") if isinstance(protoec_manifest, dict) else {}
+    protoec_threshold = None
+    if isinstance(protoec_thresholds, dict) and protoec_thresholds:
+        try:
+            protoec_threshold = min(int(key) for key in protoec_thresholds.keys())
+        except ValueError:
+            protoec_threshold = None
+    clean_threshold = clean_bundle.get("split_threshold")
+    matched_threshold = protoec_threshold if protoec_threshold is not None else clean_threshold
+    if matched_threshold is None:
+        matched_threshold = clean_threshold
+
+    protoec_full = _latest_measurement(measurements, model_id="protoec", phase="full")
+    protoec_train = _latest_measurement(measurements, model_id="protoec", phase="train")
+    protoec_test = _latest_measurement(measurements, model_id="protoec", phase="test")
+    protoec_task1 = _protoec_actual_task1_row(protoec_manifest_path, int(matched_threshold)) if matched_threshold is not None else {}
+
+    clean_train_manifest = clean_bundle.get("train_manifest") if isinstance(clean_bundle.get("train_manifest"), dict) else {}
+    clean_infer_manifest = clean_bundle.get("infer_manifest") if isinstance(clean_bundle.get("infer_manifest"), dict) else {}
+    clean_train_jobid = str(((clean_train_manifest.get("runtime_context") or {}).get("pbs_jobid", "")) if isinstance(clean_train_manifest, dict) else "")
+    clean_test_jobid = str(((clean_infer_manifest.get("runtime_context") or {}).get("pbs_jobid", "")) if isinstance(clean_infer_manifest, dict) else "")
+    clean_distance = _latest_measurement(measurements, model_id="clean", phase="setup", protocol_contains=("distance_map",))
+    clean_orphan_embed = _latest_measurement(measurements, model_id="clean", phase="full", protocol_contains=("orphan_embed",), pbs_jobids=[clean_train_jobid])
+    clean_train = _latest_measurement(measurements, model_id="clean", phase="train", pbs_jobids=[clean_train_jobid])
+    clean_test_embed = _latest_measurement(measurements, model_id="clean", phase="full", protocol_contains=("test_embed",), pbs_jobids=[clean_test_jobid])
+    clean_test = _latest_measurement(measurements, model_id="clean", phase="test", pbs_jobids=[clean_test_jobid])
+    clean_task1 = _clean_actual_task1_row(clean_bundle)
+
+    protoec_embedding_runtime = ""
+    if protoec_full and protoec_train and protoec_test:
+        protoec_embedding_runtime = max(
+            0.0,
+            float(protoec_full.get("duration_s", 0.0) or 0.0)
+            - float(protoec_train.get("duration_s", 0.0) or 0.0)
+            - float(protoec_test.get("duration_s", 0.0) or 0.0),
+        )
+
+    clean_embedding_components = [
+        float(row.get("duration_s", 0.0) or 0.0)
+        for row in (clean_orphan_embed, clean_test_embed)
+        if row
+    ]
+    clean_embedding_runtime = sum(clean_embedding_components) if clean_embedding_components else ""
+    clean_embedding_scope = ""
+    if clean_embedding_components:
+        clean_embedding_scope = "partial_orphan_plus_test_only_shared_train_embeddings_reused"
+
+    clean_including_runtime = ""
+    if clean_embedding_scope == "complete" and clean_embedding_runtime != "" and clean_distance and clean_train and clean_test:
+        clean_including_runtime = (
+            float(clean_embedding_runtime)
+            + float(clean_distance.get("duration_s", 0.0) or 0.0)
+            + float(clean_train.get("duration_s", 0.0) or 0.0)
+            + float(clean_test.get("duration_s", 0.0) or 0.0)
+        )
+
+    clean_embedding_cache_size = ""
+    clean_esm_matrix_path = ""
+    if isinstance(clean_train_manifest, dict):
+        clean_esm_matrix_path = str(clean_train_manifest.get("esm_matrix_path", "") or "")
+    if clean_esm_matrix_path:
+        esm_matrix_path = Path(clean_esm_matrix_path)
+        if esm_matrix_path.exists():
+            clean_embedding_cache_size = path_size_mib(esm_matrix_path)
+
+    protoec_row = {
+        "model_id": "protoec",
+        "display_name": "ProtoEC",
+        "split_threshold": matched_threshold if matched_threshold is not None else "",
+        "status": "completed" if protoec_full and protoec_train and protoec_test and protoec_task1 else "missing_or_staged",
+        "accuracy_weighted_f1": protoec_task1.get("weighted_f1", ""),
+        "accuracy_micro_f1": protoec_task1.get("micro_f1", ""),
+        "accuracy_top1": protoec_task1.get("exact_top1", ""),
+        "coverage": protoec_task1.get("coverage", ""),
+        "no_pred_rate": protoec_task1.get("no_pred_rate", ""),
+        "embedding_backbone": protoec_manifest.get("embedding_model", "") if isinstance(protoec_manifest, dict) else "",
+        "embedding_runtime_s": protoec_embedding_runtime,
+        "embedding_runtime_scope": "full_protocolA_minus_protocolB_train_test" if protoec_embedding_runtime != "" else "",
+        "precompute_runtime_s": "",
+        "total_training_runtime_s": protoec_train.get("duration_s", "") if protoec_train else "",
+        "training_unit": protoec_train.get("training_unit", "") if protoec_train else "",
+        "runtime_per_training_unit_s": protoec_train.get("run_time_per_episode_s", "") if protoec_train else "",
+        "test_runtime_s": protoec_test.get("duration_s", "") if protoec_test else "",
+        "including_embedding_runtime_s": protoec_full.get("duration_s", "") if protoec_full else "",
+        "excluding_embedding_runtime_s": (
+            float(protoec_train.get("duration_s", 0.0) or 0.0) + float(protoec_test.get("duration_s", 0.0) or 0.0)
+            if protoec_train and protoec_test
+            else ""
+        ),
+        "embedding_memory_gib": protoec_full.get("memory_usage_gib", "") if protoec_full else "",
+        "peak_memory_gib": max(
+            [
+                float(row.get("memory_usage_gib", 0.0) or 0.0)
+                for row in (protoec_full, protoec_train, protoec_test)
+                if row
+            ],
+            default=0.0,
+        ),
+        "trainable_params": protoec_manifest.get("trainable_params", "") if isinstance(protoec_manifest, dict) else "",
+        "total_params": protoec_manifest.get("total_params", "") if isinstance(protoec_manifest, dict) else "",
+        "checkpoint_size_mib": next(
+            (
+                obj.get("checkpoint_size_mib", "")
+                for obj in (protoec_thresholds or {}).values()
+                if isinstance(obj, dict)
+            ),
+            "",
+        ) if isinstance(protoec_thresholds, dict) else "",
+        "embedding_cache_size_mib": protoec_manifest.get("embedding_cache_size_mib", "") if isinstance(protoec_manifest, dict) else "",
+        "gpu_model": (
+            (protoec_full.get("gpu_probe") or [{}])[0].get("name", "")
+            if protoec_full and isinstance(protoec_full.get("gpu_probe"), list) and protoec_full.get("gpu_probe")
+            else protoec_full.get("gpu_model_hint", "") if protoec_full else ""
+        ),
+        "node_name": protoec_full.get("hostname", "") if protoec_full else "",
+        "container_image": protoec_full.get("container_image", "") if protoec_full else "",
+        "pbs_jobids": ",".join(
+            [str(row.get("pbs_jobid", "")) for row in (protoec_full, protoec_train, protoec_test) if row and row.get("pbs_jobid")]
+        ),
+        "notes": "Protocol A is the full measured path; Protocol B isolates cached-feature downstream training and test.",
+    }
+
+    clean_runtime_rows = [row for row in (clean_distance, clean_orphan_embed, clean_train, clean_test_embed, clean_test) if row]
+    clean_row = {
+        "model_id": "clean",
+        "display_name": "CLEAN",
+        "split_threshold": clean_threshold if clean_threshold is not None else matched_threshold if matched_threshold is not None else "",
+        "status": "completed_with_partial_embedding_accounting" if clean_train and clean_test and clean_task1 else "missing_or_staged",
+        "accuracy_weighted_f1": clean_task1.get("weighted_f1", ""),
+        "accuracy_micro_f1": clean_task1.get("micro_f1", ""),
+        "accuracy_top1": clean_task1.get("exact_top1", ""),
+        "coverage": clean_task1.get("coverage", ""),
+        "no_pred_rate": clean_task1.get("no_pred_rate", ""),
+        "embedding_backbone": clean_bundle.get("embedding_model", ""),
+        "embedding_runtime_s": clean_embedding_runtime,
+        "embedding_runtime_scope": clean_embedding_scope,
+        "precompute_runtime_s": clean_distance.get("duration_s", "") if clean_distance else "",
+        "total_training_runtime_s": clean_train.get("duration_s", "") if clean_train else "",
+        "training_unit": clean_train.get("training_unit", "") if clean_train else "epoch",
+        "runtime_per_training_unit_s": clean_train.get("run_time_per_epoch_s", "") if clean_train else "",
+        "test_runtime_s": clean_test.get("duration_s", "") if clean_test else "",
+        "including_embedding_runtime_s": clean_including_runtime,
+        "excluding_embedding_runtime_s": (
+            float(clean_distance.get("duration_s", 0.0) or 0.0)
+            + float(clean_train.get("duration_s", 0.0) or 0.0)
+            + float(clean_test.get("duration_s", 0.0) or 0.0)
+            if clean_distance and clean_train and clean_test
+            else ""
+        ),
+        "embedding_memory_gib": max(
+            [float(row.get("memory_usage_gib", 0.0) or 0.0) for row in (clean_orphan_embed, clean_test_embed) if row],
+            default=0.0,
+        ),
+        "peak_memory_gib": max([float(row.get("memory_usage_gib", 0.0) or 0.0) for row in clean_runtime_rows], default=0.0),
+        "trainable_params": clean_bundle.get("trainable_params", ""),
+        "total_params": clean_bundle.get("total_params", ""),
+        "checkpoint_size_mib": clean_bundle.get("checkpoint_size_mib", ""),
+        "embedding_cache_size_mib": clean_embedding_cache_size,
+        "gpu_model": (
+            (clean_train.get("gpu_probe") or [{}])[0].get("name", "")
+            if clean_train and isinstance(clean_train.get("gpu_probe"), list) and clean_train.get("gpu_probe")
+            else clean_train.get("gpu_model_hint", "") if clean_train else ""
+        ),
+        "node_name": clean_train.get("hostname", "") if clean_train else "",
+        "container_image": clean_train.get("container_image", "") if clean_train else "",
+        "pbs_jobids": ",".join(
+            [str(row.get("pbs_jobid", "")) for row in clean_runtime_rows if row and row.get("pbs_jobid")]
+        ),
+        "notes": "Train-set embeddings were reused from the shared cache, so the current including-embedding total is intentionally left blank until a matched train-embed rerun exists.",
+    }
+
+    return {
+        "generated_utc": datetime.now(timezone.utc).isoformat(),
+        "matched_split_threshold": matched_threshold if matched_threshold is not None else "",
+        "hardware_regime": clean_row["gpu_model"] or protoec_row["gpu_model"],
+        "rows": [protoec_row, clean_row],
+    }
 
 
 def _render_report(
@@ -495,6 +920,7 @@ def _render_report(
     operational_rows: List[Dict[str, object]],
     params_rows: List[Dict[str, object]],
     flops_rows: List[Dict[str, object]],
+    matched_summary: Dict[str, object],
 ) -> str:
     lines: List[str] = []
     lines.append("# EC-Bench Hopper GPU Runtime Benchmark Report")
@@ -546,6 +972,48 @@ def _render_report(
     else:
         lines.append("- No measured runtime JSON files were found under the scratch measurement directory yet.")
     lines.append("")
+    matched_rows = matched_summary.get("rows") if isinstance(matched_summary, dict) else []
+    if isinstance(matched_rows, list) and matched_rows:
+        lines.append("## Matched ProtoEC + CLEAN Summary")
+        matched_threshold = matched_summary.get("matched_split_threshold", "")
+        hardware_regime = matched_summary.get("hardware_regime", "")
+        lines.append(f"- Executed/staged matched split: `ID{matched_threshold}`")
+        lines.append(f"- Actual GPU regime captured so far: `{hardware_regime}`")
+        lines.append("")
+        lines.append("### Including Embedding Extraction")
+        lines.append("")
+        lines.append("| Model | Status | Weighted-F1 | Micro-F1 | Top-1 | Embedding runtime (s) | Precompute (s) | Train (s) | Test (s) | Total incl. embedding (s) | Peak memory (GiB) | GPU |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
+        for row in matched_rows:
+            lines.append(
+                f"| {row['display_name']} | {row['status']} | {row.get('accuracy_weighted_f1', '')} | {row.get('accuracy_micro_f1', '')} | "
+                f"{row.get('accuracy_top1', '')} | {row.get('embedding_runtime_s', '')} | {row.get('precompute_runtime_s', '')} | "
+                f"{row.get('total_training_runtime_s', '')} | {row.get('test_runtime_s', '')} | {row.get('including_embedding_runtime_s', '')} | "
+                f"{row.get('peak_memory_gib', '')} | {row.get('gpu_model', '')} |"
+            )
+        lines.append("")
+        lines.append("### Excluding Embedding Extraction")
+        lines.append("")
+        lines.append("| Model | Training unit | Runtime per unit (s) | Total excl. embedding (s) | Trainable params | Checkpoint (MiB) | Coverage |")
+        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: |")
+        for row in matched_rows:
+            lines.append(
+                f"| {row['display_name']} | {row.get('training_unit', '')} | {row.get('runtime_per_training_unit_s', '')} | "
+                f"{row.get('excluding_embedding_runtime_s', '')} | {row.get('trainable_params', '')} | {row.get('checkpoint_size_mib', '')} | "
+                f"{row.get('coverage', '')} |"
+            )
+        lines.append("")
+        lines.append("### Embedding Cost Breakdown")
+        lines.append("")
+        for row in matched_rows:
+            lines.append(
+                f"- `{row['display_name']}`: backbone=`{row.get('embedding_backbone', '')}`, embedding_runtime_s=`{row.get('embedding_runtime_s', '')}`, "
+                f"embedding_memory_gib=`{row.get('embedding_memory_gib', '')}`, embedding_cache_size_mib=`{row.get('embedding_cache_size_mib', '')}`, "
+                f"scope=`{row.get('embedding_runtime_scope', '')}`."
+            )
+            if row.get("notes"):
+                lines.append(f"- `{row['display_name']}` note: {row['notes']}")
+        lines.append("")
     lines.append("## Measurement gaps")
     gaps = []
     if not gpu_probe:
@@ -612,6 +1080,19 @@ def main() -> None:
         help="Optional explicit data-prep manifest generated by the Hopper prep workflow.",
     )
     ap.add_argument(
+        "--measurement-dir",
+        type=Path,
+        action="append",
+        default=[],
+        help="Additional measurement directories to merge into the summary alongside scratch_root/measurements.",
+    )
+    ap.add_argument(
+        "--clean-bundle-root",
+        type=Path,
+        default=None,
+        help="Optional durable CLEAN bundle root (for example EC-Bench/local_artifacts/clean_id30_retrained_20260329).",
+    )
+    ap.add_argument(
         "--protoec-flops-json",
         type=Path,
         default=None,
@@ -631,20 +1112,26 @@ def main() -> None:
     protoec_manifest_path = args.protoec_manifest or (scratch_root / "protoec" / "adapter_manifest.json")
     ensure_dir(out_root)
     ensure_dir(scratch_root)
+    measurement_roots = [measurements_root]
+    for extra_root in args.measurement_dir:
+        resolved = extra_root.resolve()
+        if resolved not in measurement_roots:
+            measurement_roots.append(resolved)
 
     manifest_rows = _load_manifest((args.ecbench_root / args.manifest).resolve() if not args.manifest.is_absolute() else args.manifest)
     hardware_manifest = _resolve_hardware_manifest(scratch_root)
     hardware_manifest["container_image"] = hardware_manifest.get("container_image") or os.environ.get("BENCHMARK_CONTAINER_IMAGE", "")
     data_manifest = _resolve_data_manifest(args.ecbench_root.resolve(), args.data_prep_manifest)
+    clean_bundle = _load_clean_bundle(args.clean_bundle_root)
 
     task1_rows = _task1_rows_from_official(args.ecbench_root.resolve(), manifest_rows)
     task1_rows.extend(_task1_rows_from_protoec(protoec_manifest_path))
     task1_rows = sorted(task1_rows, key=lambda row: (int(row["threshold"]), str(row["model_id"])))
 
-    measurements = _load_measurements(measurements_root)
+    measurements = _load_measurements(measurement_roots)
     operational_rows = _operational_summary(measurements)
-    artifact_rows = _artifact_inventory(args.ecbench_root.resolve(), manifest_rows, protoec_manifest_path)
-    params_rows = _params_storage_summary(manifest_rows, artifact_rows, protoec_manifest_path)
+    artifact_rows = _artifact_inventory(args.ecbench_root.resolve(), manifest_rows, protoec_manifest_path, clean_bundle)
+    params_rows = _params_storage_summary(manifest_rows, artifact_rows, protoec_manifest_path, clean_bundle)
     protoec_profiler_payload = _resolve_optional_json(
         args.protoec_flops_json,
         [
@@ -664,6 +1151,13 @@ def main() -> None:
         protoec_manifest_path,
         protoec_profiler_payload=protoec_profiler_payload,
         clean_profiler_payload=clean_profiler_payload,
+        clean_bundle=clean_bundle,
+    )
+    matched_summary = _matched_protoec_clean_summary(
+        ecbench_root=args.ecbench_root.resolve(),
+        measurements=measurements,
+        protoec_manifest_path=protoec_manifest_path,
+        clean_bundle=clean_bundle,
     )
 
     raw_scratch_link = out_root / "raw_scratch"
@@ -673,6 +1167,7 @@ def main() -> None:
 
     write_json(out_root / "hardware_manifest.json", hardware_manifest)
     write_json(out_root / "data_prep_manifest.json", data_manifest)
+    write_json(out_root / "matched_protoec_clean_summary.json", matched_summary)
     write_csv(
         out_root / "task1_metrics_summary.csv",
         task1_rows,
@@ -754,7 +1249,112 @@ def main() -> None:
         artifact_rows,
         ["model_id", "path", "kind", "size_mib"],
     )
-    report = _render_report(out_root, hardware_manifest, data_manifest, task1_rows, operational_rows, params_rows, flops_rows)
+    matched_rows = matched_summary.get("rows") if isinstance(matched_summary, dict) else []
+    write_csv(
+        out_root / "matched_protoec_clean_including_embedding.csv",
+        _select_fields(matched_rows if isinstance(matched_rows, list) else [], [
+            "model_id",
+            "display_name",
+            "split_threshold",
+            "status",
+            "accuracy_weighted_f1",
+            "accuracy_micro_f1",
+            "accuracy_top1",
+            "coverage",
+            "no_pred_rate",
+            "embedding_backbone",
+            "embedding_runtime_s",
+            "embedding_runtime_scope",
+            "precompute_runtime_s",
+            "total_training_runtime_s",
+            "training_unit",
+            "runtime_per_training_unit_s",
+            "test_runtime_s",
+            "including_embedding_runtime_s",
+            "embedding_memory_gib",
+            "peak_memory_gib",
+            "gpu_model",
+            "node_name",
+            "container_image",
+            "pbs_jobids",
+            "notes",
+        ]),
+        [
+            "model_id",
+            "display_name",
+            "split_threshold",
+            "status",
+            "accuracy_weighted_f1",
+            "accuracy_micro_f1",
+            "accuracy_top1",
+            "coverage",
+            "no_pred_rate",
+            "embedding_backbone",
+            "embedding_runtime_s",
+            "embedding_runtime_scope",
+            "precompute_runtime_s",
+            "total_training_runtime_s",
+            "training_unit",
+            "runtime_per_training_unit_s",
+            "test_runtime_s",
+            "including_embedding_runtime_s",
+            "embedding_memory_gib",
+            "peak_memory_gib",
+            "gpu_model",
+            "node_name",
+            "container_image",
+            "pbs_jobids",
+            "notes",
+        ],
+    )
+    write_csv(
+        out_root / "matched_protoec_clean_excluding_embedding.csv",
+        _select_fields(matched_rows if isinstance(matched_rows, list) else [], [
+            "model_id",
+            "display_name",
+            "split_threshold",
+            "status",
+            "accuracy_weighted_f1",
+            "accuracy_micro_f1",
+            "accuracy_top1",
+            "coverage",
+            "trainable_params",
+            "total_params",
+            "checkpoint_size_mib",
+            "embedding_cache_size_mib",
+            "training_unit",
+            "runtime_per_training_unit_s",
+            "excluding_embedding_runtime_s",
+            "gpu_model",
+            "node_name",
+            "container_image",
+            "pbs_jobids",
+            "notes",
+        ]),
+        [
+            "model_id",
+            "display_name",
+            "split_threshold",
+            "status",
+            "accuracy_weighted_f1",
+            "accuracy_micro_f1",
+            "accuracy_top1",
+            "coverage",
+            "trainable_params",
+            "total_params",
+            "checkpoint_size_mib",
+            "embedding_cache_size_mib",
+            "training_unit",
+            "runtime_per_training_unit_s",
+            "excluding_embedding_runtime_s",
+            "gpu_model",
+            "node_name",
+            "container_image",
+            "pbs_jobids",
+            "notes",
+        ],
+    )
+    report = _render_report(out_root, hardware_manifest, data_manifest, task1_rows, operational_rows, params_rows, flops_rows, matched_summary)
     (out_root / "REPORT.md").write_text(report, encoding="utf-8")
     print(f"[run_benchmark] wrote report bundle to {out_root}")
 
