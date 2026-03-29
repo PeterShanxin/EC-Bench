@@ -13,6 +13,7 @@
 *.fastq
 *.pdb
 *.pt
+/local_artifacts/
 # Compiled Python artifacts
 __pycache__/
 **/__pycache__/
