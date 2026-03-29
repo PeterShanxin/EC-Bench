@@ -5,23 +5,23 @@ set -euo pipefail
 usage() {
   cat <<'EOF'
 Usage:
-  submit_clean_id100_supconH_chain.sh --model-name NAME --train-epochs N [options]
+  submit_clean_id30_supconH_chain.sh --model-name NAME --train-epochs N [options]
 
-Queue-safe chained submission helper for the resume-safe CLEAN ID100 SupCon-Hard
+Queue-safe chained submission helper for the resume-safe CLEAN ID30 SupCon-Hard
 wrapper. This does NOT run chunks in parallel; it submits a dependency chain so
 each chunk starts only after the previous one finishes.
 
 Required:
   --model-name NAME            Shared CLEAN model name/state prefix
-  --train-epochs N             Global target epoch count (for example 5250)
+  --train-epochs N             Global target epoch count (for example 1875)
 
 Options:
-  --training-data NAME         EC-Bench training split name (default: train_ec_100)
+  --training-data NAME         EC-Bench training split name (default: train_ec_30)
   --epochs-per-chunk N         Max epochs per PBS job (default: 90)
   --job-name-prefix NAME       PBS job-name prefix (default: cleanch)
   --measurement-prefix NAME    Measurement basename prefix (default: MODEL_NAME)
   --walltime HH:MM:SS          Walltime for each chunk (default: 24:00:00)
-  --scratch-root PATH          Shared scratch root (default: /scratch/e0969321/ecbench_clean_id100_retrain_20260324)
+  --scratch-root PATH          Shared scratch root (default: /scratch/e0969321/ecbench_clean_id30_retrain_20260325)
   --expected-gpu-model MODEL   GPU model check (default: H200)
   --stage-local-ssd 0|1        Stage esm_data to /local_ssd if available (default: 1)
   --esm-cache-size N           CLEAN embedding cache size (default: 300000)
@@ -35,34 +35,34 @@ Options:
   --dry-run                    Print planned qsub commands only
 
 Examples:
-  Dry-run a full 5250-epoch chain:
-    submit_clean_id100_supconH_chain.sh \
-      --model-name train_ec_100_supconH_full \
-      --train-epochs 5250
+  Dry-run a full 1875-epoch chain:
+    submit_clean_id30_supconH_chain.sh \
+      --model-name train_ec_30_supconH_full \
+      --train-epochs 1875
 
   Submit the chain:
-    submit_clean_id100_supconH_chain.sh \
-      --model-name train_ec_100_supconH_full \
-      --train-epochs 5250 \
+    submit_clean_id30_supconH_chain.sh \
+      --model-name train_ec_30_supconH_full \
+      --train-epochs 1875 \
       --submit
 EOF
 }
 
 MODEL_NAME=""
 TRAIN_EPOCHS=""
-TRAINING_DATA="train_ec_100"
+TRAINING_DATA="train_ec_30"
 EPOCHS_PER_CHUNK=90
 JOB_NAME_PREFIX="cleanch"
 MEASUREMENT_PREFIX=""
 WALLTIME="24:00:00"
-SCRATCH_ROOT="/scratch/e0969321/ecbench_clean_id100_retrain_20260324"
+SCRATCH_ROOT="/scratch/e0969321/ecbench_clean_id30_retrain_20260325"
 EXPECTED_GPU_MODEL="H200"
 STAGE_LOCAL_SSD="1"
 ESM_CACHE_SIZE="300000"
 DEPEND_MODE="afterany"
 START_CHUNK=1
 INITIAL_DEPENDENCY=""
-WRAPPER="/home/svu/e0969321/EC-Bench/benchmark/run_clean_id100_supconH_train.pbs"
+WRAPPER="/home/svu/e0969321/EC-Bench/benchmark/run_clean_id30_supconH_train.pbs"
 MANIFEST_OUT=""
 PBS_LOG_DIR=""
 DO_SUBMIT=0

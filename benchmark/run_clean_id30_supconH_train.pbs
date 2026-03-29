@@ -4,13 +4,13 @@
 # Configure canary/full runs and EC-Bench split through environment overrides.
 #
 
-#PBS -N clean_id100_supconH
+#PBS -N clean_id30_supconH
 #PBS -q auto
 #PBS -P CFP03-SF-097
 #PBS -l select=1:ngpus=1:ncpus=12:mem=225GB
 #PBS -l walltime=24:00:00
 #PBS -j oe
-#PBS -o /home/svu/e0969321/clean_id100_supconH.log
+#PBS -o /home/svu/e0969321/clean_id30_supconH.log
 #PBS -V
 
 set -euo pipefail
@@ -22,16 +22,16 @@ module purge || true
 module load singularity
 
 IMAGE="${SINGULARITY_IMAGE:-/app1/common/singularity-img/hopper/pytorch/pytorch_2.3.0_cuda_12.4_ngc_24.04.sif}"
-SCRATCH_ROOT="${SCRATCH_ROOT:-/scratch/e0969321/ecbench_clean_id100_retrain_20260324}"
+SCRATCH_ROOT="${SCRATCH_ROOT:-/scratch/e0969321/ecbench_clean_id30_retrain_20260325}"
 PREPARED_ECBENCH_ROOT="${PREPARED_ECBENCH_ROOT:-/scratch/e0969321/ecbench_hopper_h100_task1_runtime_20260313/data_prep/ecbench_worktree}"
-TORCH_CACHE_ROOT="${TORCH_CACHE_ROOT:-/scratch/e0969321/ecbench_clean_id100_runtime_20260323/torch_cache}"
+TORCH_CACHE_ROOT="${TORCH_CACHE_ROOT:-${SCRATCH_ROOT}/torch_cache}"
 PYUSERBASE="${SCRATCH_ROOT}/pyuserbase"
 EXPECTED_GPU_MODEL="${EXPECTED_GPU_MODEL:-H200}"
-MODEL_NAME="${MODEL_NAME:-train_ec_100_supconH_canary}"
-TRAINING_DATA="${TRAINING_DATA:-train_ec_100}"
+MODEL_NAME="${MODEL_NAME:-train_ec_30_supconH_canary}"
+TRAINING_DATA="${TRAINING_DATA:-train_ec_30}"
 TRAIN_EPOCHS="${TRAIN_EPOCHS:-25}"
 MAX_EPOCHS_THIS_RUN="${MAX_EPOCHS_THIS_RUN:-0}"
-MEASUREMENT_BASENAME="${MEASUREMENT_BASENAME:-clean_id100_supconH_canary}"
+MEASUREMENT_BASENAME="${MEASUREMENT_BASENAME:-clean_id30_supconH_canary}"
 LOCAL_SSD_BASE="${LOCAL_SSD_BASE:-/local_ssd}"
 LOCAL_STAGE_FALLBACK_BASE="${LOCAL_STAGE_FALLBACK_BASE:-/local}"
 LOCAL_SSD_USERNAME="${LOCAL_SSD_USERNAME:-${USER:-${LOGNAME:-}}}"
@@ -41,6 +41,7 @@ fi
 LOCAL_SSD_USER_ROOT="${LOCAL_SSD_USER_ROOT:-${LOCAL_SSD_BASE}/${LOCAL_SSD_USERNAME}}"
 STAGE_ESM_TO_LOCAL_SSD="${STAGE_ESM_TO_LOCAL_SSD:-1}"
 CLEAN_ESM_CACHE_SIZE="${CLEAN_ESM_CACHE_SIZE:-300000}"
+NODE_LOCAL_CACHE_MODE="${NODE_LOCAL_CACHE_MODE:-shared}"
 NODE_LOCAL_CACHE_ROOT_NAME="${NODE_LOCAL_CACHE_ROOT_NAME:-ecbench_clean_cache}"
 NODE_LOCAL_CACHE_WAIT_SECS="${NODE_LOCAL_CACHE_WAIT_SECS:-3600}"
 NODE_LOCAL_CACHE_STALE_SECS="${NODE_LOCAL_CACHE_STALE_SECS:-21600}"
@@ -109,6 +110,10 @@ append_local_stage_status() {
 }
 
 cleanup_node_local_stage() {
+  if [ "${NODE_LOCAL_CACHE_MODE}" != "shared" ] && [ -n "${LOCAL_STAGE_ROOT}" ] && [ -d "${LOCAL_STAGE_ROOT}" ]; then
+    echo "[clean-train] cleaning node-local stage root: ${LOCAL_STAGE_ROOT}"
+    rm -rf "${LOCAL_STAGE_ROOT}" || true
+  fi
   if [ "${LOCAL_STAGE_LOCK_HELD}" = "1" ] && [ -n "${LOCAL_STAGE_LOCK_DIR}" ] && [ -d "${LOCAL_STAGE_LOCK_DIR}" ]; then
     rm -rf "${LOCAL_STAGE_LOCK_DIR}" || true
   fi
@@ -119,7 +124,7 @@ trap cleanup_node_local_stage EXIT
 acquire_node_local_lock() {
   local lockdir="$1"
   local waited=0
-  local now epoch age
+  local now epoch age holder_job
   while true; do
     if mkdir "${lockdir}" 2>/dev/null; then
       LOCAL_STAGE_LOCK_DIR="${lockdir}"
@@ -129,6 +134,12 @@ acquire_node_local_lock() {
       return 0
     fi
     if [ -d "${lockdir}" ]; then
+      holder_job="$(sed -n 's/^job=//p' "${lockdir}/holder.txt" 2>/dev/null || true)"
+      if [ -n "${holder_job}" ] && ! qstat "${holder_job}" >/dev/null 2>&1; then
+        echo "[clean-train] removing orphaned node-local lock from finished job: ${lockdir} holder_job=${holder_job}"
+        rm -rf "${lockdir}" || true
+        continue
+      fi
       epoch="$(stat -c %Y "${lockdir}" 2>/dev/null || echo 0)"
       now="$(date +%s)"
       age=$((now - epoch))
@@ -173,34 +184,48 @@ if [ "${STAGE_ESM_TO_LOCAL_SSD}" = "1" ]; then
       if mkdir -p "${candidate_user_root}" 2>/dev/null; then
         LOCAL_STAGE_BASE_SELECTED="${candidate_base}"
         LOCAL_SSD_USER_ROOT="${candidate_user_root}"
-        LOCAL_STAGE_ROOT="${LOCAL_SSD_USER_ROOT}/${NODE_LOCAL_CACHE_ROOT_NAME}/${PREPARED_ROOT_KEY}/${TRAINING_DATA}"
-        LOCAL_STAGE_READY_FILE="${LOCAL_STAGE_ROOT}/.ready"
-        LOCAL_STAGE_LOCK_CANDIDATE="${LOCAL_STAGE_ROOT}.lock"
-        ACTIVE_ECBENCH_ROOT="${LOCAL_STAGE_ROOT}/ecbench_worktree"
-        ACTIVE_ESM_DIR="${ACTIVE_ECBENCH_ROOT}/CLEAN/data/esm_data"
-        ACTIVE_ECBENCH_SOURCE="node_local_cache"
-        LOCAL_SSD_STAGE_REASON="staged"
-        LOCAL_STAGE_BASE_STATUS="$(stat -c '%A %U:%G %n' "${candidate_base}" 2>/dev/null || echo unavailable)"
-        if [ -f "${LOCAL_STAGE_READY_FILE}" ]; then
-          LOCAL_STAGE_CACHE_STATUS="hit"
-          echo "[clean-train] reusing node-local cache root: ${ACTIVE_ECBENCH_ROOT}"
-        else
-          acquire_node_local_lock "${LOCAL_STAGE_LOCK_CANDIDATE}"
+        if [ "${NODE_LOCAL_CACHE_MODE}" = "shared" ]; then
+          LOCAL_STAGE_ROOT="${LOCAL_SSD_USER_ROOT}/${NODE_LOCAL_CACHE_ROOT_NAME}/${PREPARED_ROOT_KEY}/${TRAINING_DATA}"
+          LOCAL_STAGE_READY_FILE="${LOCAL_STAGE_ROOT}/.ready"
+          LOCAL_STAGE_LOCK_CANDIDATE="${LOCAL_STAGE_ROOT}.lock"
+          ACTIVE_ECBENCH_ROOT="${LOCAL_STAGE_ROOT}/ecbench_worktree"
+          ACTIVE_ESM_DIR="${ACTIVE_ECBENCH_ROOT}/CLEAN/data/esm_data"
+          ACTIVE_ECBENCH_SOURCE="node_local_cache"
+          LOCAL_SSD_STAGE_REASON="staged"
+          LOCAL_STAGE_BASE_STATUS="$(stat -c '%A %U:%G %n' "${candidate_base}" 2>/dev/null || echo unavailable)"
           if [ -f "${LOCAL_STAGE_READY_FILE}" ]; then
-            LOCAL_STAGE_CACHE_STATUS="hit_after_wait"
-            echo "[clean-train] reusing node-local cache root after waiting: ${ACTIVE_ECBENCH_ROOT}"
+            LOCAL_STAGE_CACHE_STATUS="hit"
+            echo "[clean-train] reusing node-local cache root: ${ACTIVE_ECBENCH_ROOT}"
           else
-            LOCAL_STAGE_CACHE_STATUS="hydrated"
-            hydrate_started_epoch="$(date +%s)"
-            echo "[clean-train] hydrating node-local cache root: ${ACTIVE_ECBENCH_ROOT}"
-            sync_file "${PREPARED_ECBENCH_ROOT}/data/${TRAINING_DATA}.csv" "${ACTIVE_ECBENCH_ROOT}/data/${TRAINING_DATA}.csv"
-            sync_tree "${PREPARED_ECBENCH_ROOT}/CLEAN/data/esm_data" "${ACTIVE_ESM_DIR}"
-            mkdir -p "${LOCAL_STAGE_ROOT}"
-            printf 'prepared_root=%s\ntraining_data=%s\nhost=%s\npbs_jobid=%s\ntimestamp=%s\n' \
-              "${PREPARED_ECBENCH_ROOT}" "${TRAINING_DATA}" "${HOST_NODE}" "${PBS_JOBID:-}" "$(date -Is)" > "${LOCAL_STAGE_READY_FILE}"
-            LOCAL_STAGE_HYDRATE_DURATION_S="$(( $(date +%s) - hydrate_started_epoch ))"
+            acquire_node_local_lock "${LOCAL_STAGE_LOCK_CANDIDATE}"
+            if [ -f "${LOCAL_STAGE_READY_FILE}" ]; then
+              LOCAL_STAGE_CACHE_STATUS="hit_after_wait"
+              echo "[clean-train] reusing node-local cache root after waiting: ${ACTIVE_ECBENCH_ROOT}"
+            else
+              LOCAL_STAGE_CACHE_STATUS="hydrated"
+              hydrate_started_epoch="$(date +%s)"
+              echo "[clean-train] hydrating node-local cache root: ${ACTIVE_ECBENCH_ROOT}"
+              sync_file "${PREPARED_ECBENCH_ROOT}/data/${TRAINING_DATA}.csv" "${ACTIVE_ECBENCH_ROOT}/data/${TRAINING_DATA}.csv"
+              sync_tree "${PREPARED_ECBENCH_ROOT}/CLEAN/data/esm_data" "${ACTIVE_ESM_DIR}"
+              mkdir -p "${LOCAL_STAGE_ROOT}"
+              printf 'prepared_root=%s\ntraining_data=%s\nhost=%s\npbs_jobid=%s\ntimestamp=%s\n' \
+                "${PREPARED_ECBENCH_ROOT}" "${TRAINING_DATA}" "${HOST_NODE}" "${PBS_JOBID:-}" "$(date -Is)" > "${LOCAL_STAGE_READY_FILE}"
+              LOCAL_STAGE_HYDRATE_DURATION_S="$(( $(date +%s) - hydrate_started_epoch ))"
+            fi
+            release_node_local_lock
           fi
-          release_node_local_lock
+        else
+          LOCAL_STAGE_ROOT="${LOCAL_SSD_USER_ROOT}/ecbench_clean_${PBS_JOBID%%.*}"
+          ACTIVE_ECBENCH_ROOT="${LOCAL_STAGE_ROOT}/ecbench_worktree"
+          ACTIVE_ESM_DIR="${ACTIVE_ECBENCH_ROOT}/CLEAN/data/esm_data"
+          ACTIVE_ECBENCH_SOURCE="node_local"
+          LOCAL_SSD_STAGE_REASON="staged"
+          LOCAL_STAGE_CACHE_STATUS="isolated"
+          hydrate_started_epoch="$(date +%s)"
+          echo "[clean-train] staging data to node-local root: ${ACTIVE_ECBENCH_ROOT}"
+          sync_file "${PREPARED_ECBENCH_ROOT}/data/${TRAINING_DATA}.csv" "${ACTIVE_ECBENCH_ROOT}/data/${TRAINING_DATA}.csv"
+          sync_tree "${PREPARED_ECBENCH_ROOT}/CLEAN/data/esm_data" "${ACTIVE_ESM_DIR}"
+          LOCAL_STAGE_HYDRATE_DURATION_S="$(( $(date +%s) - hydrate_started_epoch ))"
         fi
         break
       fi
@@ -222,6 +247,7 @@ echo "[clean-train] active_esm_dir=${ACTIVE_ESM_DIR}"
 echo "[clean-train] active_data_source=${ACTIVE_ECBENCH_SOURCE}"
 echo "[clean-train] local_stage_base=${LOCAL_STAGE_BASE_SELECTED:-none}"
 echo "[clean-train] local_stage_root=${LOCAL_STAGE_ROOT:-none}"
+echo "[clean-train] node_local_cache_mode=${NODE_LOCAL_CACHE_MODE}"
 echo "[clean-train] local_stage_cache_status=${LOCAL_STAGE_CACHE_STATUS}"
 echo "[clean-train] local_stage_hydrate_duration_s=${LOCAL_STAGE_HYDRATE_DURATION_S}"
 echo "[clean-train] local_ssd_stage_reason=${LOCAL_SSD_STAGE_REASON}"
