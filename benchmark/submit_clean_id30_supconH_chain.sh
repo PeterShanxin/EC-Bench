@@ -25,6 +25,7 @@ Options:
   --expected-gpu-model MODEL   GPU model check (default: H200)
   --stage-local-ssd 0|1        Stage esm_data to /local_ssd if available (default: 1)
   --esm-cache-size N           CLEAN embedding cache size (default: 300000)
+  --seed N                     CLEAN training seed (default: 1234)
   --depend-mode MODE           PBS dependency mode (default: afterany)
   --start-chunk N              First chunk index to submit (default: 1)
   --initial-dependency JOBID   Optional dependency for the first submitted chunk
@@ -59,6 +60,7 @@ SCRATCH_ROOT="/scratch/e0969321/ecbench_clean_id30_retrain_20260325"
 EXPECTED_GPU_MODEL="H200"
 STAGE_LOCAL_SSD="1"
 ESM_CACHE_SIZE="300000"
+SEED="1234"
 DEPEND_MODE="afterany"
 START_CHUNK=1
 INITIAL_DEPENDENCY=""
@@ -111,6 +113,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --esm-cache-size)
       ESM_CACHE_SIZE="$2"
+      shift 2
+      ;;
+    --seed)
+      SEED="$2"
       shift 2
       ;;
     --depend-mode)
@@ -215,7 +221,7 @@ for (( chunk=START_CHUNK; chunk<=TOTAL_CHUNKS; chunk++ )); do
   measurement_basename="${MEASUREMENT_PREFIX}_${chunk_label}"
   dependency_id="${PREV_JOB_ID:-}"
 
-  vlist="MODEL_NAME=${MODEL_NAME},TRAINING_DATA=${TRAINING_DATA},TRAIN_EPOCHS=${TRAIN_EPOCHS},MAX_EPOCHS_THIS_RUN=${EPOCHS_PER_CHUNK},MEASUREMENT_BASENAME=${measurement_basename},SCRATCH_ROOT=${SCRATCH_ROOT},EXPECTED_GPU_MODEL=${EXPECTED_GPU_MODEL},STAGE_ESM_TO_LOCAL_SSD=${STAGE_LOCAL_SSD},CLEAN_ESM_CACHE_SIZE=${ESM_CACHE_SIZE}"
+  vlist="MODEL_NAME=${MODEL_NAME},TRAINING_DATA=${TRAINING_DATA},TRAIN_EPOCHS=${TRAIN_EPOCHS},MAX_EPOCHS_THIS_RUN=${EPOCHS_PER_CHUNK},MEASUREMENT_BASENAME=${measurement_basename},SCRATCH_ROOT=${SCRATCH_ROOT},EXPECTED_GPU_MODEL=${EXPECTED_GPU_MODEL},STAGE_ESM_TO_LOCAL_SSD=${STAGE_LOCAL_SSD},CLEAN_ESM_CACHE_SIZE=${ESM_CACHE_SIZE},CLEAN_SEED=${SEED}"
   qsub_args=(qsub -N "${job_name}" -l "walltime=${WALLTIME}")
   if [[ -n "${dependency_id}" ]]; then
     qsub_args+=(-W "depend=${DEPEND_MODE}:${dependency_id}")

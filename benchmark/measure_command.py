@@ -142,6 +142,35 @@ def _env_from_assignments(items: Sequence[str]) -> Dict[str, str]:
     return env
 
 
+def _coerce_meta_value(raw: str) -> object:
+    text = str(raw).strip()
+    lowered = text.lower()
+    if lowered in {"true", "false"}:
+        return lowered == "true"
+    try:
+        return int(text)
+    except ValueError:
+        pass
+    try:
+        return float(text)
+    except ValueError:
+        pass
+    return text
+
+
+def _meta_from_assignments(items: Sequence[str]) -> Dict[str, object]:
+    payload: Dict[str, object] = {}
+    for item in items:
+        if "=" not in item:
+            continue
+        key, value = item.split("=", 1)
+        key = key.strip()
+        if not key:
+            continue
+        payload[key] = _coerce_meta_value(value)
+    return payload
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description="Measure wall-clock and memory for a benchmark command.")
     ap.add_argument("--model-id", required=True)
@@ -155,6 +184,7 @@ def main() -> None:
     ap.add_argument("--unit-count", type=int, default=0)
     ap.add_argument("--sample-seconds", type=float, default=1.0)
     ap.add_argument("--env", action="append", default=[], help="Additional KEY=VALUE env vars.")
+    ap.add_argument("--meta", action="append", default=[], help="Additional payload metadata as KEY=VALUE.")
     ap.add_argument("command", nargs=argparse.REMAINDER)
     args = ap.parse_args()
 
@@ -169,6 +199,7 @@ def main() -> None:
     ensure_dir(args.log_file.parent)
 
     env = _env_from_assignments(args.env)
+    extra_meta = _meta_from_assignments(args.meta)
     started_utc = datetime.now(timezone.utc).isoformat()
     gpu_probe = _gpu_probe()
     gpu_model_hint = os.environ.get("BENCHMARK_GPU_MODEL_HINT", "").strip()
@@ -264,6 +295,7 @@ def main() -> None:
         "pbs_queue": os.environ.get("PBS_QUEUE", ""),
         "gpu_model_hint": gpu_model_hint,
     }
+    payload.update(extra_meta)
     write_json(args.json_out, payload)
     if exit_code != 0:
         raise SystemExit(exit_code)

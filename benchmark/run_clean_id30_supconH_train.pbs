@@ -41,6 +41,7 @@ fi
 LOCAL_SSD_USER_ROOT="${LOCAL_SSD_USER_ROOT:-${LOCAL_SSD_BASE}/${LOCAL_SSD_USERNAME}}"
 STAGE_ESM_TO_LOCAL_SSD="${STAGE_ESM_TO_LOCAL_SSD:-1}"
 CLEAN_ESM_CACHE_SIZE="${CLEAN_ESM_CACHE_SIZE:-300000}"
+CLEAN_SEED="${CLEAN_SEED:-1234}"
 NODE_LOCAL_CACHE_MODE="${NODE_LOCAL_CACHE_MODE:-shared}"
 NODE_LOCAL_CACHE_ROOT_NAME="${NODE_LOCAL_CACHE_ROOT_NAME:-ecbench_clean_cache}"
 NODE_LOCAL_CACHE_WAIT_SECS="${NODE_LOCAL_CACHE_WAIT_SECS:-3600}"
@@ -252,6 +253,7 @@ echo "[clean-train] local_stage_cache_status=${LOCAL_STAGE_CACHE_STATUS}"
 echo "[clean-train] local_stage_hydrate_duration_s=${LOCAL_STAGE_HYDRATE_DURATION_S}"
 echo "[clean-train] local_ssd_stage_reason=${LOCAL_SSD_STAGE_REASON}"
 echo "[clean-train] clean_esm_cache_size=${CLEAN_ESM_CACHE_SIZE}"
+echo "[clean-train] clean_seed=${CLEAN_SEED}"
 
 mkdir -p "${SCRATCH_ROOT}" "${PYUSERBASE}" "${SCRATCH_ROOT}/logs" "${SCRATCH_ROOT}/measurements" "${SCRATCH_ROOT}/clean/model" "${SCRATCH_ROOT}/clean/orphans"
 mkdir -p "${SCRATCH_ROOT}/cache" "${TORCH_CACHE_ROOT}"
@@ -365,6 +367,7 @@ PY
       --manifest-out '${SCRATCH_ROOT}/clean/model/${MODEL_NAME}.manifest.json' \
       --epoch '${TRAIN_EPOCHS}' \
       --max-epochs-this-run '${MAX_EPOCHS_THIS_RUN}' \
+      --seed '${CLEAN_SEED}' \
       --resume \
       --require-cuda
 "

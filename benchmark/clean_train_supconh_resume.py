@@ -249,6 +249,7 @@ def main() -> None:
                 "n_neg": int(args.n_neg),
                 "temp": float(args.temp),
                 "adaptive_rate": int(args.adaptive_rate),
+                "seed": int(args.seed),
             },
         )
         print("-" * 75)
@@ -265,6 +266,7 @@ def main() -> None:
         "status": status,
         "model_name": args.model_name,
         "training_data": args.training_data,
+        "seed": int(args.seed),
         "start_epoch": start_epoch,
         "target_epoch": int(args.epoch),
         "end_epoch_this_run": last_completed_epoch,

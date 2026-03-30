@@ -94,6 +94,69 @@ def _count_csv_rows(path: Path) -> int:
         return sum(1 for _ in reader)
 
 
+def _safe_int(value: object) -> int | None:
+    try:
+        return int(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def _safe_float(value: object) -> float | None:
+    try:
+        return float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return None
+
+
+def _task1_scope_fields(
+    *,
+    coverage: object,
+    queries_total: object,
+    queries_evaluated: object,
+    source_type: str,
+) -> Dict[str, object]:
+    total = _safe_int(queries_total)
+    evaluated = _safe_int(queries_evaluated)
+    coverage_value = _safe_float(coverage)
+
+    if total is None and source_type == "official_csv":
+        total = evaluated
+    if evaluated is None and total is not None and source_type == "official_csv":
+        evaluated = total
+    if evaluated is None and total is not None and coverage_value is not None and coverage_value >= 0.999999:
+        evaluated = total
+
+    if total is not None and evaluated is not None and evaluated < total:
+        coverage_scope = "evaluated_subset_of_full_test"
+        accuracy_scope = "evaluated_subset_only"
+        accuracy_direct_compare_ok = False
+    elif total is not None and evaluated is not None:
+        coverage_scope = "full_test"
+        accuracy_scope = "full_test"
+        accuracy_direct_compare_ok = True
+    elif source_type == "official_csv":
+        coverage_scope = "full_test"
+        accuracy_scope = "full_test"
+        accuracy_direct_compare_ok = True
+    else:
+        coverage_scope = ""
+        accuracy_scope = ""
+        accuracy_direct_compare_ok = None
+
+    missing = ""
+    if total is not None and evaluated is not None:
+        missing = max(0, total - evaluated)
+
+    return {
+        "coverage_total_queries": total if total is not None else "",
+        "coverage_evaluated_queries": evaluated if evaluated is not None else "",
+        "coverage_missing_queries": missing,
+        "coverage_scope": coverage_scope,
+        "accuracy_scope": accuracy_scope,
+        "accuracy_direct_compare_ok": accuracy_direct_compare_ok,
+    }
+
+
 def _data_prep_manifest(ecbench_root: Path) -> Dict[str, object]:
     data_root = ecbench_root / "data"
     required = {
@@ -143,6 +206,7 @@ def _task1_rows_from_official(ecbench_root: Path, manifest_rows: List[Dict[str, 
     for threshold, rel_path in OFFICIAL_FILES.items():
         csv_path = ecbench_root / rel_path
         rows = read_csv_rows(csv_path)
+        total_rows = len(rows)
         for item in manifest_rows:
             model_id = str(item["model_id"])
             if model_id == "protoec":
@@ -167,6 +231,12 @@ def _task1_rows_from_official(ecbench_root: Path, manifest_rows: List[Dict[str, 
                     "weighted_f1": metrics.weighted_f1,
                     "coverage": metrics.coverage,
                     "no_pred_rate": metrics.no_pred_rate,
+                    **_task1_scope_fields(
+                        coverage=metrics.coverage,
+                        queries_total=total_rows,
+                        queries_evaluated=total_rows,
+                        source_type="official_csv",
+                    ),
                     "variant_note": item.get("notes", ""),
                 }
             )
@@ -213,6 +283,30 @@ def _task1_rows_from_protoec(protoec_manifest_path: Path) -> List[Dict[str, obje
             except (TypeError, ValueError):
                 coverage = metrics.coverage
             no_pred_rate = 1.0 - coverage
+        queries_total = obj.get("queries_total", "")
+        if queries_total in ("", None):
+            queries_total = metrics_payload.get("queries_total", "")
+        queries_evaluated = obj.get("queries_evaluated", "")
+        if queries_evaluated in ("", None):
+            queries_evaluated = metrics_payload.get("queries_evaluated", _count_csv_rows(pred_path))
+        scope_fields = _task1_scope_fields(
+            coverage=coverage,
+            queries_total=queries_total,
+            queries_evaluated=queries_evaluated,
+            source_type="protoec_adapter",
+        )
+        variant_note = str(obj.get("protocol_note", "") or "").strip()
+        if scope_fields.get("accuracy_scope") == "evaluated_subset_only":
+            evaluated = scope_fields.get("coverage_evaluated_queries", "")
+            total = scope_fields.get("coverage_total_queries", "")
+            subset_note = (
+                f"Accuracy metrics are evaluated on the covered subset only ({evaluated}/{total} queries); "
+                "missing-label queries are excluded from the accuracy denominator."
+            )
+            variant_note = f"{variant_note} {subset_note}".strip()
+        elif metrics_payload:
+            extra_note = "Coverage is aligned to the current global_metrics.json for the full-test ProtoEC EC-Bench evaluation path."
+            variant_note = f"{variant_note} {extra_note}".strip()
         out.append(
             {
                 "threshold": int(threshold_raw),
@@ -229,10 +323,8 @@ def _task1_rows_from_protoec(protoec_manifest_path: Path) -> List[Dict[str, obje
                 "weighted_f1": metrics.weighted_f1,
                 "coverage": coverage,
                 "no_pred_rate": no_pred_rate,
-                "variant_note": (
-                    obj.get("protocol_note", "")
-                    + (" Coverage is taken from ProtoEC global_metrics.json because the prediction CSV only contains the evaluated subset." if metrics_payload else "")
-                ).strip(),
+                **scope_fields,
+                "variant_note": variant_note,
             }
         )
     return out
@@ -375,8 +467,10 @@ def _operational_summary(measurements: List[Dict[str, object]]) -> List[Dict[str
             {
                 "model_id": model_id,
                 "protocol": protocol,
+                "setup_phase_status": "missing",
                 "training_phase_status": "missing",
                 "test_phase_status": "missing",
+                "setup_runtime_s": None,
                 "memory_usage_gib": None,
                 "memory_kind": "",
                 "run_time_per_epoch_s": None,
@@ -388,10 +482,18 @@ def _operational_summary(measurements: List[Dict[str, object]]) -> List[Dict[str
                 "gpu_model": "",
                 "node_name": row.get("hostname", ""),
                 "container_image": row.get("container_image", ""),
+                "split_threshold": row.get("split_threshold", ""),
+                "runtime_scope": row.get("runtime_scope", ""),
+                "threads_requested": row.get("threads_requested", ""),
+                "hardware_class": row.get("hardware_class", ""),
+                "notes": row.get("notes", ""),
             },
         )
         phase = str(row.get("phase", ""))
-        if phase == "train":
+        if phase == "setup":
+            bucket["setup_phase_status"] = "ok" if _exit_ok(row) else "failed"
+            bucket["setup_runtime_s"] = row.get("duration_s")
+        elif phase == "train":
             bucket["training_phase_status"] = "ok" if _exit_ok(row) else "failed"
             bucket["total_training_runtime_s"] = row.get("duration_s")
             bucket["run_time_per_epoch_s"] = row.get("run_time_per_epoch_s")
@@ -413,6 +515,10 @@ def _operational_summary(measurements: List[Dict[str, object]]) -> List[Dict[str
         if not bucket["gpu_model"] and bucket["node_name"]:
             bucket["gpu_model"] = _pbs_gpu_model_for_host(str(bucket["node_name"]))
         bucket["container_image"] = row.get("container_image", bucket["container_image"])
+        for extra_key in ("split_threshold", "runtime_scope", "threads_requested", "hardware_class", "notes"):
+            extra_value = row.get(extra_key)
+            if extra_value not in ("", None):
+                bucket[extra_key] = extra_value
 
         mem_value = row.get("memory_usage_gib")
         try:
@@ -618,6 +724,14 @@ def _flops_summary(
     rows: List[Dict[str, object]] = []
     for item in manifest_rows:
         model_id = str(item["model_id"])
+        family = str(item.get("family", "") or "")
+        default_status = "opaque_external_binary_or_not_profiled"
+        if family in {"search", "rule", "profile"}:
+            default_status = "non_neural_search_tool"
+        elif family in {"ml"}:
+            default_status = "opaque_external_binary_or_traditional_ml"
+        elif family in {"neural", "contrastive", "fewshot"}:
+            default_status = "not_yet_profiled_model_core"
         row = {
             "model_id": model_id,
             "display_name": item["display_name"],
@@ -625,7 +739,7 @@ def _flops_summary(
             "train_flops_per_epoch_or_episode": "",
             "test_flops_total": "",
             "test_flops_per_protein": "",
-            "flops_status": "opaque_external_binary_or_not_profiled",
+            "flops_status": default_status,
         }
         if model_id == "protoec" and isinstance(protoec_profiler_payload, dict) and protoec_profiler_payload:
             row.update(
@@ -721,6 +835,12 @@ def _clean_actual_task1_row(clean_bundle: Dict[str, object]) -> Dict[str, object
         "weighted_f1": metrics.get("weighted_f1", ""),
         "coverage": metrics.get("coverage", ""),
         "no_pred_rate": metrics.get("no_pred_rate", ""),
+        **_task1_scope_fields(
+            coverage=metrics.get("coverage", ""),
+            queries_total=metrics.get("query_count", ""),
+            queries_evaluated=metrics.get("query_count", ""),
+            source_type="clean_retrained_bundle",
+        ),
         "variant_note": "Executed-split retrained ID30 checkpoint from the durable home bundle.",
     }
 
@@ -802,12 +922,24 @@ def _matched_protoec_clean_summary(
         "model_id": "protoec",
         "display_name": "ProtoEC",
         "split_threshold": matched_threshold if matched_threshold is not None else "",
-        "status": "completed" if protoec_full and protoec_train and protoec_test and protoec_task1 else "missing_or_staged",
+        "status": (
+            "completed_partial_accuracy_scope"
+            if protoec_full and protoec_train and protoec_test and protoec_task1 and protoec_task1.get("accuracy_scope") == "evaluated_subset_only"
+            else "completed"
+            if protoec_full and protoec_train and protoec_test and protoec_task1
+            else "missing_or_staged"
+        ),
         "accuracy_weighted_f1": protoec_task1.get("weighted_f1", ""),
         "accuracy_micro_f1": protoec_task1.get("micro_f1", ""),
         "accuracy_top1": protoec_task1.get("exact_top1", ""),
         "coverage": protoec_task1.get("coverage", ""),
         "no_pred_rate": protoec_task1.get("no_pred_rate", ""),
+        "accuracy_scope": protoec_task1.get("accuracy_scope", ""),
+        "accuracy_direct_compare_ok": protoec_task1.get("accuracy_direct_compare_ok", ""),
+        "coverage_scope": protoec_task1.get("coverage_scope", ""),
+        "coverage_total_queries": protoec_task1.get("coverage_total_queries", ""),
+        "coverage_evaluated_queries": protoec_task1.get("coverage_evaluated_queries", ""),
+        "coverage_missing_queries": protoec_task1.get("coverage_missing_queries", ""),
         "embedding_backbone": protoec_manifest.get("embedding_model", "") if isinstance(protoec_manifest, dict) else "",
         "embedding_runtime_s": protoec_embedding_runtime,
         "embedding_runtime_scope": "full_protocolA_minus_protocolB_train_test" if protoec_embedding_runtime != "" else "",
@@ -852,7 +984,12 @@ def _matched_protoec_clean_summary(
         "pbs_jobids": ",".join(
             [str(row.get("pbs_jobid", "")) for row in (protoec_full, protoec_train, protoec_test) if row and row.get("pbs_jobid")]
         ),
-        "notes": "Protocol A is the full measured path; Protocol B isolates cached-feature downstream training and test.",
+        "notes": (
+            "Protocol A is the full measured path; Protocol B isolates cached-feature downstream training and test. "
+            "Current accuracy metrics are subset-only because queries without labels in the prototype bank are excluded from evaluation."
+            if protoec_task1.get("accuracy_scope") == "evaluated_subset_only"
+            else "Protocol A is the full measured path; Protocol B isolates cached-feature downstream training and test."
+        ),
     }
 
     clean_runtime_rows = [row for row in (clean_distance, clean_orphan_embed, clean_train, clean_test_embed, clean_test) if row]
@@ -866,6 +1003,12 @@ def _matched_protoec_clean_summary(
         "accuracy_top1": clean_task1.get("exact_top1", ""),
         "coverage": clean_task1.get("coverage", ""),
         "no_pred_rate": clean_task1.get("no_pred_rate", ""),
+        "accuracy_scope": clean_task1.get("accuracy_scope", ""),
+        "accuracy_direct_compare_ok": clean_task1.get("accuracy_direct_compare_ok", ""),
+        "coverage_scope": clean_task1.get("coverage_scope", ""),
+        "coverage_total_queries": clean_task1.get("coverage_total_queries", ""),
+        "coverage_evaluated_queries": clean_task1.get("coverage_evaluated_queries", ""),
+        "coverage_missing_queries": clean_task1.get("coverage_missing_queries", ""),
         "embedding_backbone": clean_bundle.get("embedding_model", ""),
         "embedding_runtime_s": clean_embedding_runtime,
         "embedding_runtime_scope": clean_embedding_scope,
@@ -953,11 +1096,32 @@ def _render_report(
     lines.append("")
     lines.append("## Task 1 accuracy summary")
     if task1_rows:
-        ranked = sorted(task1_rows, key=lambda row: (int(row["threshold"]), float(row["weighted_f1"])), reverse=True)
-        for row in ranked[:8]:
-            lines.append(
-                f"- ID{row['threshold']} `{row['display_name']}`: weighted-F1 `{float(row['weighted_f1']):.4f}`, micro-F1 `{float(row['micro_f1']):.4f}`, top-1 `{float(row['exact_top1']):.4f}`"
-            )
+        focus_threshold = matched_summary.get("matched_split_threshold", "") if isinstance(matched_summary, dict) else ""
+        try:
+            focus_threshold_int = int(focus_threshold)
+        except (TypeError, ValueError):
+            thresholds = sorted({int(row["threshold"]) for row in task1_rows})
+            focus_threshold_int = thresholds[0] if thresholds else 30
+        lines.append(f"- Accuracy summary below is pinned to `ID{focus_threshold_int}` because the current matched runtime comparison uses that split.")
+        focus_rows = [row for row in task1_rows if int(row["threshold"]) == focus_threshold_int]
+        comparable_rows = [row for row in focus_rows if row.get("accuracy_scope") == "full_test"]
+        partial_rows = [row for row in focus_rows if row.get("accuracy_scope") == "evaluated_subset_only"]
+        if comparable_rows:
+            ranked = sorted(comparable_rows, key=lambda row: float(row["weighted_f1"]), reverse=True)
+            for row in ranked:
+                lines.append(
+                    f"- ID{row['threshold']} `{row['display_name']}`: weighted-F1 `{float(row['weighted_f1']):.4f}`, micro-F1 `{float(row['micro_f1']):.4f}`, "
+                    f"top-1 `{float(row['exact_top1']):.4f}`, coverage `{float(row['coverage']):.4f}` on the full evaluated test surface."
+                )
+        if partial_rows:
+            lines.append("- Partial-coverage rows for the same split are listed separately and are not ranked against the full-test rows:")
+            for row in sorted(partial_rows, key=lambda item: (int(item["threshold"]), str(item["model_id"]))):
+                lines.append(
+                    f"- ID{row['threshold']} `{row['display_name']}`: weighted-F1 `{float(row['weighted_f1']):.4f}`, micro-F1 `{float(row['micro_f1']):.4f}`, "
+                    f"top-1 `{float(row['exact_top1']):.4f}`, coverage `{float(row['coverage']):.4f}` with "
+                    f"`{row.get('coverage_evaluated_queries', '')}/{row.get('coverage_total_queries', '')}` queries evaluated "
+                    f"(`{row.get('accuracy_scope', '')}` / `{row.get('coverage_scope', '')}`)."
+                )
     else:
         lines.append("- No Task 1 metrics were available.")
     lines.append("")
@@ -965,9 +1129,10 @@ def _render_report(
     if operational_rows:
         for row in operational_rows:
             lines.append(
-                f"- `{row['model_id']}` / protocol `{row['protocol']}`: full=`{row.get('full_runtime_s', '')}`s, train=`{row.get('total_training_runtime_s', '')}`s, "
-                f"test=`{row.get('test_runtime_s', '')}`s, latency=`{row.get('per_protein_latency_ms', '')}` ms/protein, "
-                f"memory=`{row.get('memory_usage_gib', '')}` GiB ({row.get('memory_kind', '')})"
+                f"- `{row['model_id']}` / protocol `{row['protocol']}`: setup=`{row.get('setup_runtime_s', '')}`s, full=`{row.get('full_runtime_s', '')}`s, "
+                f"train=`{row.get('total_training_runtime_s', '')}`s, test=`{row.get('test_runtime_s', '')}`s, "
+                f"latency=`{row.get('per_protein_latency_ms', '')}` ms/protein, memory=`{row.get('memory_usage_gib', '')}` GiB ({row.get('memory_kind', '')}), "
+                f"hardware=`{row.get('hardware_class', '') or row.get('gpu_model', '')}`, scope=`{row.get('runtime_scope', '')}`"
             )
     else:
         lines.append("- No measured runtime JSON files were found under the scratch measurement directory yet.")
@@ -982,23 +1147,26 @@ def _render_report(
         lines.append("")
         lines.append("### Including Embedding Extraction")
         lines.append("")
-        lines.append("| Model | Status | Weighted-F1 | Micro-F1 | Top-1 | Embedding runtime (s) | Precompute (s) | Train (s) | Test (s) | Total incl. embedding (s) | Peak memory (GiB) | GPU |")
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
+        lines.append("| Model | Status | Accuracy scope | Evaluated / total | Coverage | Weighted-F1 | Micro-F1 | Top-1 | Precompute / embedding bucket (s) | Precompute (s) | Train (s) | Test (s) | Total incl. embedding (s) | Peak memory (GiB) | GPU |")
+        lines.append("| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | --- |")
         for row in matched_rows:
             lines.append(
-                f"| {row['display_name']} | {row['status']} | {row.get('accuracy_weighted_f1', '')} | {row.get('accuracy_micro_f1', '')} | "
-                f"{row.get('accuracy_top1', '')} | {row.get('embedding_runtime_s', '')} | {row.get('precompute_runtime_s', '')} | "
+                f"| {row['display_name']} | {row['status']} | {row.get('accuracy_scope', '')} | "
+                f"{row.get('coverage_evaluated_queries', '')}/{row.get('coverage_total_queries', '')} | {row.get('coverage', '')} | "
+                f"{row.get('accuracy_weighted_f1', '')} | {row.get('accuracy_micro_f1', '')} | {row.get('accuracy_top1', '')} | "
+                f"{row.get('embedding_runtime_s', '')} | {row.get('precompute_runtime_s', '')} | "
                 f"{row.get('total_training_runtime_s', '')} | {row.get('test_runtime_s', '')} | {row.get('including_embedding_runtime_s', '')} | "
                 f"{row.get('peak_memory_gib', '')} | {row.get('gpu_model', '')} |"
             )
         lines.append("")
         lines.append("### Excluding Embedding Extraction")
         lines.append("")
-        lines.append("| Model | Training unit | Runtime per unit (s) | Total excl. embedding (s) | Trainable params | Checkpoint (MiB) | Coverage |")
-        lines.append("| --- | --- | ---: | ---: | ---: | ---: | ---: |")
+        lines.append("| Model | Accuracy scope | Evaluated / total | Training unit | Runtime per unit (s) | Total excl. embedding (s) | Trainable params | Checkpoint (MiB) | Coverage |")
+        lines.append("| --- | --- | ---: | --- | ---: | ---: | ---: | ---: | ---: |")
         for row in matched_rows:
             lines.append(
-                f"| {row['display_name']} | {row.get('training_unit', '')} | {row.get('runtime_per_training_unit_s', '')} | "
+                f"| {row['display_name']} | {row.get('accuracy_scope', '')} | {row.get('coverage_evaluated_queries', '')}/{row.get('coverage_total_queries', '')} | "
+                f"{row.get('training_unit', '')} | {row.get('runtime_per_training_unit_s', '')} | "
                 f"{row.get('excluding_embedding_runtime_s', '')} | {row.get('trainable_params', '')} | {row.get('checkpoint_size_mib', '')} | "
                 f"{row.get('coverage', '')} |"
             )
@@ -1006,22 +1174,41 @@ def _render_report(
         lines.append("### Embedding Cost Breakdown")
         lines.append("")
         for row in matched_rows:
-            lines.append(
-                f"- `{row['display_name']}`: backbone=`{row.get('embedding_backbone', '')}`, embedding_runtime_s=`{row.get('embedding_runtime_s', '')}`, "
-                f"embedding_memory_gib=`{row.get('embedding_memory_gib', '')}`, embedding_cache_size_mib=`{row.get('embedding_cache_size_mib', '')}`, "
-                f"scope=`{row.get('embedding_runtime_scope', '')}`."
-            )
+            if row.get("model_id") == "protoec":
+                lines.append(
+                    f"- `{row['display_name']}`: backbone=`{row.get('embedding_backbone', '')}`, precompute_or_embedding_bucket_s=`{row.get('embedding_runtime_s', '')}`, "
+                    f"embedding_memory_gib=`{row.get('embedding_memory_gib', '')}`, embedding_cache_size_mib=`{row.get('embedding_cache_size_mib', '')}`, "
+                    f"scope=`{row.get('embedding_runtime_scope', '')}`. This bucket is derived as `Protocol A full - Protocol B train - Protocol B test`, so it includes embedding plus other full-path adapter/precompute overhead."
+                )
+            elif row.get("model_id") == "clean":
+                lines.append(
+                    f"- `{row['display_name']}`: backbone=`{row.get('embedding_backbone', '')}`, partial_embedding_runtime_s=`{row.get('embedding_runtime_s', '')}`, "
+                    f"embedding_memory_gib=`{row.get('embedding_memory_gib', '')}`, embedding_cache_size_mib=`{row.get('embedding_cache_size_mib', '')}`, "
+                    f"scope=`{row.get('embedding_runtime_scope', '')}`. This currently covers orphan/test-side embedding only; the train-set embeddings were reused from cache."
+                )
+            else:
+                lines.append(
+                    f"- `{row['display_name']}`: backbone=`{row.get('embedding_backbone', '')}`, embedding_runtime_s=`{row.get('embedding_runtime_s', '')}`, "
+                    f"embedding_memory_gib=`{row.get('embedding_memory_gib', '')}`, embedding_cache_size_mib=`{row.get('embedding_cache_size_mib', '')}`, "
+                    f"scope=`{row.get('embedding_runtime_scope', '')}`."
+                )
             if row.get("notes"):
                 lines.append(f"- `{row['display_name']}` note: {row['notes']}")
+        if any(row.get("accuracy_scope") == "evaluated_subset_only" for row in matched_rows):
+            lines.append("- Partial-coverage accuracy rows are kept visible for transparency, but they should not be read as direct full-test replacements for the full-coverage comparator.")
         lines.append("")
     lines.append("## Measurement gaps")
     gaps = []
     if not gpu_probe:
         gaps.append("hardware preflight did not capture in-container gpu_probe rows; GPU model is currently inferred from PBS host context instead")
-    if any(not row.get("gpu_model") for row in operational_rows):
+    if any((row.get("memory_kind") == "gpu") and not row.get("gpu_model") for row in operational_rows):
         gaps.append("operational summary rows are missing explicit gpu_model strings even when GPU memory was sampled")
+    if any(row.get("accuracy_scope") == "evaluated_subset_only" for row in matched_rows if isinstance(row, dict)):
+        gaps.append("ProtoEC currently exposes only subset-evaluated Task 1 accuracy in the matched paper-facing comparison; runtime remains comparable, but accuracy is not yet a direct full-test replacement for CLEAN")
     if any(str(row.get("flops_status", "")).startswith("approx") for row in flops_rows):
         gaps.append("current ProtoEC FLOPs are temporary analytical head-only placeholders; final reporting should prefer profiler-based model-core FLOPs for ProtoEC/CLEAN and keep other baselines as NA")
+    if any((str(row.get("model_id", "")) == "clean") and (str(row.get("flops_status", "")) == "not_yet_profiled_model_core") for row in flops_rows):
+        gaps.append("CLEAN model-core FLOPs are not yet profiled in this bundle")
     if gaps:
         for item in gaps:
             lines.append(f"- {item}")
@@ -1186,6 +1373,12 @@ def main() -> None:
             "weighted_f1",
             "coverage",
             "no_pred_rate",
+            "coverage_scope",
+            "accuracy_scope",
+            "accuracy_direct_compare_ok",
+            "coverage_total_queries",
+            "coverage_evaluated_queries",
+            "coverage_missing_queries",
             "variant_note",
         ],
     )
@@ -1200,9 +1393,11 @@ def main() -> None:
         [
             "model_id",
             "protocol",
+            "setup_phase_status",
             "training_phase_status",
             "test_phase_status",
             "full_phase_status",
+            "setup_runtime_s",
             "memory_usage_gib",
             "memory_kind",
             "run_time_per_epoch_s",
@@ -1211,6 +1406,11 @@ def main() -> None:
             "test_runtime_s",
             "full_runtime_s",
             "per_protein_latency_ms",
+            "split_threshold",
+            "runtime_scope",
+            "threads_requested",
+            "hardware_class",
+            "notes",
             "gpu_model",
             "node_name",
             "container_image",
@@ -1260,8 +1460,14 @@ def main() -> None:
             "accuracy_weighted_f1",
             "accuracy_micro_f1",
             "accuracy_top1",
+            "accuracy_scope",
+            "accuracy_direct_compare_ok",
             "coverage",
             "no_pred_rate",
+            "coverage_scope",
+            "coverage_total_queries",
+            "coverage_evaluated_queries",
+            "coverage_missing_queries",
             "embedding_backbone",
             "embedding_runtime_s",
             "embedding_runtime_scope",
@@ -1287,8 +1493,14 @@ def main() -> None:
             "accuracy_weighted_f1",
             "accuracy_micro_f1",
             "accuracy_top1",
+            "accuracy_scope",
+            "accuracy_direct_compare_ok",
             "coverage",
             "no_pred_rate",
+            "coverage_scope",
+            "coverage_total_queries",
+            "coverage_evaluated_queries",
+            "coverage_missing_queries",
             "embedding_backbone",
             "embedding_runtime_s",
             "embedding_runtime_scope",
@@ -1317,7 +1529,13 @@ def main() -> None:
             "accuracy_weighted_f1",
             "accuracy_micro_f1",
             "accuracy_top1",
+            "accuracy_scope",
+            "accuracy_direct_compare_ok",
             "coverage",
+            "coverage_scope",
+            "coverage_total_queries",
+            "coverage_evaluated_queries",
+            "coverage_missing_queries",
             "trainable_params",
             "total_params",
             "checkpoint_size_mib",
@@ -1339,7 +1557,13 @@ def main() -> None:
             "accuracy_weighted_f1",
             "accuracy_micro_f1",
             "accuracy_top1",
+            "accuracy_scope",
+            "accuracy_direct_compare_ok",
             "coverage",
+            "coverage_scope",
+            "coverage_total_queries",
+            "coverage_evaluated_queries",
+            "coverage_missing_queries",
             "trainable_params",
             "total_params",
             "checkpoint_size_mib",
