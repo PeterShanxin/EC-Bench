@@ -206,7 +206,12 @@ def _task1_rows_from_official(ecbench_root: Path, manifest_rows: List[Dict[str, 
     for threshold, rel_path in OFFICIAL_FILES.items():
         csv_path = ecbench_root / rel_path
         rows = read_csv_rows(csv_path)
-        total_rows = len(rows)
+        evaluated_rows = len(rows)
+        # EC-Bench release CSVs in OFFICIAL_FILES are `*_go_3.csv` subsets.
+        # When the prepared split CSV exists, treat that as the full test size
+        # so the report correctly flags these rows as subset-evaluated.
+        full_test_rows = _count_csv_rows(ecbench_root / "data" / f"test_ec_{threshold}.csv")
+        total_rows = full_test_rows if full_test_rows else evaluated_rows
         for item in manifest_rows:
             model_id = str(item["model_id"])
             if model_id == "protoec":
@@ -234,7 +239,7 @@ def _task1_rows_from_official(ecbench_root: Path, manifest_rows: List[Dict[str, 
                     **_task1_scope_fields(
                         coverage=metrics.coverage,
                         queries_total=total_rows,
-                        queries_evaluated=total_rows,
+                        queries_evaluated=evaluated_rows,
                         source_type="official_csv",
                     ),
                     "variant_note": item.get("notes", ""),
