@@ -1,0 +1,68 @@
+#!/bin/bash
+#PBS -P CFP03-SF-097
+#PBS -q auto
+#PBS -N clean_id30_seed_pilot_infer
+#PBS -l select=1:ngpus=1
+#PBS -l walltime=02:00:00
+
+set -euo pipefail
+
+LOG_ROOT="/home/svu/e0969321/runLogs/pbs"
+mkdir -p "${LOG_ROOT}"
+LOG_FILE="${LOG_ROOT}/${PBS_JOBNAME:-job}.${PBS_JOBID:-manual}.log"
+exec >> "${LOG_FILE}" 2>&1
+
+echo "[$(date -Is)] Job starting"
+echo "HOSTNAME=${HOSTNAME:-}"
+echo "PBS_JOBID=${PBS_JOBID:-}"
+echo "PBS_NCPUS=${PBS_NCPUS:-}"
+echo "PBS_GPUFILE=${PBS_GPUFILE:-}"
+
+source /app1/ebapps/ebenv_hopper.sh
+module load singularity
+
+SIF="/app1/common/singularity-img/hopper/pytorch/pytorch_2.3.0_cuda_12.4_ngc_24.04.sif"
+
+ECB_ROOT="/scratch/e0969321/ecbench_hopper_h100_task1_runtime_20260313/data_prep/ecbench_worktree"
+EMBED_DIR="${ECB_ROOT}/CLEAN/data/esm_data"
+ESM_MATRIX="/scratch/e0969321/ecbench_clean_id30_retrain_20260325/clean/distance_map/train_ec_30_esm.pkl"
+
+CODE_ROOT="/home/svu/e0969321/EC-Bench"
+SCRIPT_PATH="${CODE_ROOT}/benchmark/clean_infer_maxsep.py"
+
+OUT_ROOT="/home/svu/e0969321/EC-Bench/local_artifacts/clean_id30_retrained_20260329/seed_pilot"
+
+run_seed() {
+  local seed="$1"
+  local seed_dir="${OUT_ROOT}/clean_seed${seed}"
+  local ckpt="${seed_dir}/train_ec_30_supconH_clean_seed${seed}.pth"
+  local prefix="${seed_dir}/test_ec_30"
+  local metrics="${seed_dir}/infer_test_ec_30_metrics.json"
+  local manifest="${seed_dir}/infer_test_ec_30_manifest.json"
+
+  echo "[$(date -Is)] Seed ${seed}: starting"
+  echo "seed_dir=${seed_dir}"
+  echo "ckpt=${ckpt}"
+
+  singularity exec -e --nv "${SIF}" env PYTHONPATH="${CODE_ROOT}" \
+    python3 "${SCRIPT_PATH}" \
+      --ecbench-root "${ECB_ROOT}" \
+      --train-data train_ec_30 \
+      --test-data test_ec_30 \
+      --embedding-dir "${EMBED_DIR}" \
+      --esm-matrix-path "${ESM_MATRIX}" \
+      --checkpoint-path "${ckpt}" \
+      --predictions-prefix "${prefix}" \
+      --metrics-out "${metrics}" \
+      --manifest-out "${manifest}" \
+      --resume \
+      --require-cuda
+
+  echo "[$(date -Is)] Seed ${seed}: done"
+  ls -lh "${seed_dir}/test_ec_30_maxsep.csv" "${metrics}" "${manifest}" || true
+}
+
+run_seed 2234
+run_seed 3234
+
+echo "[$(date -Is)] Job complete"
