@@ -23,3 +23,7 @@ __pycache__/
 *.trace.json
 *.prof
 *.nvvp
+
+# Hopper/PBS stdout+stderr files
+*.o[0-9]*
+*.e[0-9]*
