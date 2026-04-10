@@ -26,6 +26,9 @@ Options:
   --stage-local-ssd 0|1        Stage esm_data to /local_ssd if available (default: 1)
   --esm-cache-size N           CLEAN embedding cache size (default: 300000)
   --seed N                     CLEAN training seed (default: 1234)
+  --node-local-cache-mode MODE
+                               Node-local cache mode forwarded to the wrapper
+                               (default: shared)
   --depend-mode MODE           PBS dependency mode (default: afterany)
   --start-chunk N              First chunk index to submit (default: 1)
   --initial-dependency JOBID   Optional dependency for the first submitted chunk
@@ -61,6 +64,7 @@ EXPECTED_GPU_MODEL="H200"
 STAGE_LOCAL_SSD="1"
 ESM_CACHE_SIZE="300000"
 SEED="1234"
+NODE_LOCAL_CACHE_MODE="shared"
 DEPEND_MODE="afterany"
 START_CHUNK=1
 INITIAL_DEPENDENCY=""
@@ -117,6 +121,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --seed)
       SEED="$2"
+      shift 2
+      ;;
+    --node-local-cache-mode)
+      NODE_LOCAL_CACHE_MODE="$2"
       shift 2
       ;;
     --depend-mode)
@@ -213,6 +221,7 @@ echo "[submit_clean_chain] epochs_per_chunk=${EPOCHS_PER_CHUNK}"
 echo "[submit_clean_chain] total_chunks=${TOTAL_CHUNKS}"
 echo "[submit_clean_chain] start_chunk=${START_CHUNK}"
 echo "[submit_clean_chain] initial_dependency=${INITIAL_DEPENDENCY:-none}"
+echo "[submit_clean_chain] node_local_cache_mode=${NODE_LOCAL_CACHE_MODE}"
 echo "[submit_clean_chain] depend_mode=${DEPEND_MODE}"
 
 for (( chunk=START_CHUNK; chunk<=TOTAL_CHUNKS; chunk++ )); do
@@ -221,7 +230,7 @@ for (( chunk=START_CHUNK; chunk<=TOTAL_CHUNKS; chunk++ )); do
   measurement_basename="${MEASUREMENT_PREFIX}_${chunk_label}"
   dependency_id="${PREV_JOB_ID:-}"
 
-  vlist="MODEL_NAME=${MODEL_NAME},TRAINING_DATA=${TRAINING_DATA},TRAIN_EPOCHS=${TRAIN_EPOCHS},MAX_EPOCHS_THIS_RUN=${EPOCHS_PER_CHUNK},MEASUREMENT_BASENAME=${measurement_basename},SCRATCH_ROOT=${SCRATCH_ROOT},EXPECTED_GPU_MODEL=${EXPECTED_GPU_MODEL},STAGE_ESM_TO_LOCAL_SSD=${STAGE_LOCAL_SSD},CLEAN_ESM_CACHE_SIZE=${ESM_CACHE_SIZE},CLEAN_SEED=${SEED}"
+  vlist="MODEL_NAME=${MODEL_NAME},TRAINING_DATA=${TRAINING_DATA},TRAIN_EPOCHS=${TRAIN_EPOCHS},MAX_EPOCHS_THIS_RUN=${EPOCHS_PER_CHUNK},MEASUREMENT_BASENAME=${measurement_basename},SCRATCH_ROOT=${SCRATCH_ROOT},EXPECTED_GPU_MODEL=${EXPECTED_GPU_MODEL},STAGE_ESM_TO_LOCAL_SSD=${STAGE_LOCAL_SSD},CLEAN_ESM_CACHE_SIZE=${ESM_CACHE_SIZE},CLEAN_SEED=${SEED},NODE_LOCAL_CACHE_MODE=${NODE_LOCAL_CACHE_MODE}"
   qsub_args=(qsub -N "${job_name}" -l "walltime=${WALLTIME}")
   if [[ -n "${dependency_id}" ]]; then
     qsub_args+=(-W "depend=${DEPEND_MODE}:${dependency_id}")
